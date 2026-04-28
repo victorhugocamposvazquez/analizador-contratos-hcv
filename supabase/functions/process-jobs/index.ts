@@ -43,6 +43,17 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
+/** Base64 sin desplegar todo el buffer en un solo `fromCharCode(...bytes)` (revienta la pila en fotos grandes). */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const CHUNK = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
 async function processJob(job: any): Promise<void> {
   console.log(`[job ${job.id}] start (attempt ${job.attempts})`);
 
@@ -53,7 +64,7 @@ async function processJob(job: any): Promise<void> {
   if (dlErr || !blob) throw new Error(`download: ${dlErr?.message ?? "no blob"}`);
 
   const buf = new Uint8Array(await blob.arrayBuffer());
-  const base64 = btoa(String.fromCharCode(...buf));
+  const base64 = uint8ArrayToBase64(buf);
   const mediaType = (blob.type || "image/jpeg") as
     | "image/jpeg"
     | "image/png"
