@@ -10,6 +10,8 @@ import DniBatchRenameForm from "@/components/DniBatchRenameForm";
 import DniBatchLiveRefresh from "@/components/DniBatchLiveRefresh";
 
 export const dynamic = "force-dynamic";
+/** Vercel: amplía tiempo de servidor en plan Pro; en Hobby sigue habiendo ~10 s de tope efectivo. */
+export const maxDuration = 60;
 
 type ExRow = {
   numero_documento: string | null;
@@ -54,18 +56,24 @@ export default async function DniBatchDetailPage({
     .range(0, DNI_BATCH_TABLE_MAX_ROWS - 1);
 
   const jid = (jobs ?? []).map((j) => j.id);
-  const extrCols =
-    "dni_job_id, numero_documento, nif_valid, extraction_confidence, status, notes";
-  const { data: extraMap, error: exErr } = await fetchDniExtractionsByJobIds(
-    supabase,
-    batch.id,
-    jid,
-    extrCols
-  );
-  if (exErr) {
-    console.error("[dni batch page] extractions:", exErr);
+  /** Sin jobs terminados/revisados/fallidos no hay filas en dni_extractions: ahorramos muchas queries. */
+  const skipExtractionsQuery =
+    s.done === 0 && s.needs_review === 0 && s.failed === 0;
+  let byJob = new Map<string, Record<string, unknown>>();
+  if (!skipExtractionsQuery && jid.length > 0) {
+    const extrCols =
+      "dni_job_id, numero_documento, nif_valid, extraction_confidence, status, notes";
+    const { data: extraMap, error: exErr } = await fetchDniExtractionsByJobIds(
+      supabase,
+      batch.id,
+      jid,
+      extrCols
+    );
+    if (exErr) {
+      console.error("[dni batch page] extractions:", exErr);
+    }
+    byJob = extraMap ?? new Map();
   }
-  const byJob = extraMap ?? new Map();
   const tableTruncated = s.total > DNI_BATCH_TABLE_MAX_ROWS;
 
   const pct = s.total > 0 ? Math.round(((s.done + s.failed) / s.total) * 100) : 0;
@@ -77,6 +85,7 @@ export default async function DniBatchDetailPage({
 
       <div className="flex flex-wrap gap-4 justify-between">
         <Link
+          prefetch={false}
           href="/contracts/dnis/batches"
           className="text-sm text-slate-600 hover:underline"
         >

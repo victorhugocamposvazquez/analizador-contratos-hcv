@@ -8,7 +8,7 @@ export default function DniBatchLiveRefresh({ active }: { active: boolean }) {
   const router = useRouter();
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => router.refresh(), 9500);
+    const t = setInterval(() => router.refresh(), 12000);
     return () => clearInterval(t);
   }, [active, router]);
   return null;

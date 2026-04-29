@@ -71,7 +71,7 @@ export async function fetchDniExtractionsByJobIds(
     chunks.push(jobIds.slice(i, i + IN_CHUNK));
   }
 
-  const concurrency = 8;
+  const concurrency = 4;
   for (let i = 0; i < chunks.length; i += concurrency) {
     const slice = chunks.slice(i, i + concurrency);
     const settled = await Promise.all(
