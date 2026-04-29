@@ -9,6 +9,7 @@ import {
 import BatchDuplicateCompareSection, {
   type DuplicateGroupItem,
 } from "@/components/BatchDuplicateCompareSection";
+import BatchRenameForm from "@/components/BatchRenameForm";
 
 export const dynamic = "force-dynamic";
 
@@ -95,22 +96,35 @@ export default async function BatchDetail({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <Link
           href="/contracts/batches"
           className="text-sm text-slate-600 hover:underline"
         >
           ← Lotes
         </Link>
+        <Link
+          href={`/contracts?batch=${encodeURIComponent(params.id)}`}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-800 hover:bg-slate-50"
+        >
+          Contratos de este lote
+        </Link>
       </div>
 
-      <div className="bg-white border rounded-2xl shadow-sm p-5 space-y-3">
-        <div>
-          <h1 className="text-xl font-semibold">{batch.name}</h1>
-          <p className="text-xs text-slate-500">
-            Creado {formatDate(batch.created_at)}
-          </p>
-        </div>
+        <div className="bg-white border rounded-2xl shadow-sm p-5 space-y-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">
+              {(batch.name as string)?.trim() || `Lote ${batch.id.slice(0, 8)}…`}
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Creado {formatDate(batch.created_at)}
+            </p>
+            <p className="text-xs font-mono text-slate-400 mt-2 break-all">{batch.id}</p>
+          </div>
+          <BatchRenameForm
+            batchId={batch.id}
+            initialName={(batch.name as string | null) ?? null}
+          />
         <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-slate-900 transition-all"

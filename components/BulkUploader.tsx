@@ -69,6 +69,7 @@ export default function BulkUploader() {
 
   const [forceServer, setForceServer] = useState(false);
   const [forceBatchCopies, setForceBatchCopies] = useState(false);
+  const [batchName, setBatchName] = useState("");
   const [showDupDialog, setShowDupDialog] = useState(false);
 
   function pickFiles() {
@@ -80,6 +81,7 @@ export default function BulkUploader() {
     setForceServer(false);
     setForceBatchCopies(false);
     pendingRef.current = null;
+    setBatchName("");
     setState({
       total: 0,
       uploadTotal: 0,
@@ -303,7 +305,7 @@ export default function BulkUploader() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: `Lote ${new Date().toLocaleString("es-ES")}`,
+        name: batchName.trim() || undefined,
         total_files: toUpload.length,
       }),
     });
@@ -489,6 +491,22 @@ export default function BulkUploader() {
 
   return (
     <div className="bg-white rounded-2xl border shadow-sm overflow-hidden relative">
+      <div className="px-5 py-3 border-b border-slate-100">
+        <label className="block text-xs font-medium text-slate-600 mb-1">
+          Nombre del lote (opcional)
+        </label>
+        <input
+          type="text"
+          value={batchName}
+          onChange={(e) => setBatchName(e.target.value)}
+          placeholder="Ej. Promo abril tienda norte"
+          className="w-full max-w-xl rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/20"
+          maxLength={240}
+        />
+        <p className="text-xs text-slate-500 mt-1">
+          Sirve para localizar esto luego en Contratos filtrando por lote.
+        </p>
+      </div>
       {showDupDialog && d && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"

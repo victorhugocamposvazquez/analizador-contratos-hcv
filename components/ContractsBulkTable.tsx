@@ -20,7 +20,11 @@ export type ContractRow = {
   created_at: string;
   original_filename: string | null;
   storage_path: string;
+  job_id?: string | null;
   localidad?: string | null;
+  batch_id?: string | null;
+  /** Nombre del lote si hay batch_id */
+  batch_label?: string;
   jobs?: unknown;
 };
 
@@ -108,7 +112,9 @@ export default function ContractsBulkTable({ rows }: { rows: ContractRow[] }) {
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="w-10 px-2 py-2"></th>
+              <th className="text-left px-4 py-2 font-medium">Lote</th>
               <th className="text-left px-4 py-2 font-medium">Archivo original</th>
+              <th className="text-left px-4 py-2 font-medium">Localidad</th>
               <th className="text-left px-4 py-2 font-medium">Albarán</th>
               <th className="text-left px-4 py-2 font-medium">Fecha</th>
               <th className="text-left px-4 py-2 font-medium">Cliente</th>
@@ -135,6 +141,19 @@ export default function ContractsBulkTable({ rows }: { rows: ContractRow[] }) {
                       aria-label={`Seleccionar ${display}`}
                     />
                   </td>
+                  <td className="px-4 py-2 align-top max-w-[8rem]">
+                    {c.batch_id && c.batch_label ? (
+                      <Link
+                        href={`/contracts?batch=${encodeURIComponent(c.batch_id)}`}
+                        className="text-slate-700 hover:underline text-xs break-words"
+                        title="Filtrar este lote"
+                      >
+                        {c.batch_label}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-4 py-2">
                     <div
                       className="font-mono text-xs text-slate-800 whitespace-normal break-words max-w-[min(22rem,40vw)]"
@@ -142,6 +161,9 @@ export default function ContractsBulkTable({ rows }: { rows: ContractRow[] }) {
                     >
                       {display}
                     </div>
+                  </td>
+                  <td className="px-4 py-2 text-xs text-slate-700 max-w-[9rem] truncate" title={c.localidad ?? ""}>
+                    {c.localidad?.trim() || "—"}
                   </td>
                   <td className="px-4 py-2 font-mono">{c.num_albaran || "—"}</td>
                   <td className="px-4 py-2">{formatDate(c.fecha_promocion)}</td>
