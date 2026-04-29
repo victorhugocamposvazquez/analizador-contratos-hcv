@@ -19,7 +19,9 @@ export default function ContractsLiveRefresh() {
     pathname === "/contracts/batches" ||
     (pathname.startsWith("/contracts/batches/") &&
       pathname !== "/contracts/batches") ||
-    pathname === "/contracts/review";
+    pathname === "/contracts/review" ||
+    pathname === "/contracts/dnis" ||
+    pathname.startsWith("/contracts/dnis/");
   const pollMs = queuesPath ? 3200 : 6500;
 
   const scheduleRefresh = useCallback(() => {
@@ -50,6 +52,21 @@ export default function ContractsLiveRefresh() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "batches" },
+        scheduleRefresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dni_batches" },
+        scheduleRefresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dni_jobs" },
+        scheduleRefresh
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dni_extractions" },
         scheduleRefresh
       )
       .subscribe((status) => {

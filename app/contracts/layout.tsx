@@ -20,11 +20,16 @@ export default async function ContractsLayout({
     .select("*", { count: "exact", head: true })
     .eq("status", "needs_review");
 
-  // Jobs en marcha (badge)
-  const { count: jobsActive } = await supabase
-    .from("jobs")
-    .select("*", { count: "exact", head: true })
-    .in("status", ["pending", "processing"]);
+  const [{ count: jobsActive }, { count: dniJobsActive }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["pending", "processing"]),
+    supabase
+      .from("dni_jobs")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["pending", "processing"]),
+  ]);
 
   return (
     <div className="min-h-screen">
@@ -38,7 +43,11 @@ export default async function ContractsLayout({
             <LogoutButton />
           </div>
         </div>
-        <NavTabs reviewCount={reviewCount ?? 0} jobsActive={jobsActive ?? 0} />
+        <NavTabs
+          reviewCount={reviewCount ?? 0}
+          jobsActive={jobsActive ?? 0}
+          dniJobsActive={dniJobsActive ?? 0}
+        />
       </header>
       <ContractsLiveRefresh />
       <main className="max-w-6xl mx-auto px-6 py-6">{children}</main>

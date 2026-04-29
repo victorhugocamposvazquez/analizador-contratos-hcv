@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 export default function NavTabs({
   reviewCount,
   jobsActive,
+  dniJobsActive,
 }: {
   reviewCount: number;
   jobsActive: number;
+  dniJobsActive: number;
 }) {
   const path = usePathname();
   const tabs = [
@@ -33,6 +35,13 @@ export default function NavTabs({
       label: "Lotes",
       badge: jobsActive > 0 ? `${jobsActive} en cola` : null,
       match: (p: string) => p.startsWith("/contracts/batches"),
+    },
+    {
+      href: "/contracts/dnis",
+      label: "Fotos DNI/NIE",
+      badge:
+        dniJobsActive > 0 ? `${dniJobsActive} en cola` : null,
+      match: (p: string) => p.startsWith("/contracts/dnis"),
     },
     {
       href: "/contracts/info",
