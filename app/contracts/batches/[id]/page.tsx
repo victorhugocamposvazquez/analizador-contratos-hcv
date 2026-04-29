@@ -2,6 +2,13 @@ import { createClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDate, displayFilename } from "@/lib/utils";
+import {
+  clusterContractIds,
+  summarizeBatchDuplicates,
+} from "@/lib/batch-duplicate-clusters";
+import BatchDuplicateCompareSection, {
+  type DuplicateGroupItem,
+} from "@/components/BatchDuplicateCompareSection";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +47,46 @@ export default async function BatchDetail({
     .eq("batch_id", batch.id)
     .order("created_at", { ascending: true })
     .limit(2000);
+
+  const { data: batchContractsRaw } = await supabase
+    .from("contracts")
+    .select(
+      "id, nif, fecha_promocion, num_albaran, original_filename, storage_path, status, marked_duplicate"
+    )
+    .eq("batch_id", batch.id);
+
+  const batchContracts = batchContractsRaw ?? [];
+  const clusters = clusterContractIds(batchContracts);
+  const dupSummary = summarizeBatchDuplicates(batchContracts, clusters);
+
+  const byContractId = new Map(batchContracts.map((c) => [c.id, c]));
+  const multiClusters = clusters.filter((g) => g.length >= 2);
+
+  let compareGroups: DuplicateGroupItem[][] = [];
+  if (multiClusters.length > 0) {
+    compareGroups = await Promise.all(
+      multiClusters.map((ids) =>
+        Promise.all(
+          ids.map(async (id): Promise<DuplicateGroupItem> => {
+            const c = byContractId.get(id)!;
+            const { data: sig } = await supabase.storage
+              .from("contracts")
+              .createSignedUrl(c.storage_path, 3600);
+            return {
+              id: c.id,
+              filename: displayFilename(c.original_filename, c.storage_path),
+              signedUrl: sig?.signedUrl ?? null,
+              status: c.status,
+              marked_duplicate: c.marked_duplicate ?? null,
+              num_albaran: c.num_albaran,
+              fecha_promocion: c.fecha_promocion,
+              nif: c.nif,
+            };
+          })
+        )
+      )
+    );
+  }
 
   const inProgress = s.pending + s.processing > 0;
   const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
@@ -94,6 +141,68 @@ export default async function BatchDetail({
           </Link>
         )}
       </div>
+
+      {/* Resumen informativo: duplicidad dentro del lote vs revisión */}
+      <div className="bg-white border rounded-2xl shadow-sm p-5 space-y-3">
+        <div>
+          <h2 className="font-semibold text-slate-900 text-lg">
+            Contratos extraídos de este lote
+          </h2>
+          <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
+            Calculado solo entre las <strong>fotos ya procesadas</strong> de este lote:
+            coincide si comparten mismo NIF y fecha de promoción o el mismo número de
+            albarán — igual que usa el programa para alertar antes de revisar el resto del
+            histórico.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900">
+              Sin repetir dentro del lote
+            </p>
+            <p className="text-3xl font-bold text-emerald-950 mt-1 tabular-nums">
+              {dupSummary.sinDuplicarEnLote}
+            </p>
+            <p className="text-xs text-emerald-900/85 mt-2 leading-snug">
+              Contratos cuya foto{" "}
+              <strong>no se parece a ninguna otra</strong> de este mismo envío por
+              datos detectados (NIF+fecha o nº de albarán).
+            </p>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+              Con coincidencias entre sí
+            </p>
+            <p className="text-3xl font-bold text-amber-950 mt-1 tabular-nums">
+              {dupSummary.contratosEnGrupoDuplicado}
+            </p>
+            <p className="text-xs text-amber-900/85 mt-2 leading-snug">
+              Contratos agrupados en{" "}
+              <strong>{dupSummary.gruposDuplicados} grupo{dupSummary.gruposDuplicados !== 1 ? "s" : ""}</strong> donde
+              al menos <strong>dos fotos siguen pareciendo el mismo caso</strong>. Comparadlas
+              más abajo.
+            </p>
+          </div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-900">
+              Por revisar a mano
+            </p>
+            <p className="text-3xl font-bold text-blue-950 mt-1 tabular-nums">
+              {dupSummary.porRevisar}
+            </p>
+            <p className="text-xs text-blue-900/85 mt-2 leading-snug">
+              Pendientes en la lista &quot;
+              <Link href="/contracts/review" className="underline font-medium">
+                Por revisar
+              </Link>
+              &quot;: duplicidad posible fuera del lote <strong>o</strong> foto leída con
+              poca seguridad.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <BatchDuplicateCompareSection groups={compareGroups} />
 
       {batchJobs && batchJobs.length > 0 && (
         <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
