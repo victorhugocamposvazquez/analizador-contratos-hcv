@@ -1,6 +1,5 @@
 /**
- * Misma idea que la RPC find_duplicates: dos contratos "se parecen" si
- * (mismo NIF + misma fecha), o mismo nº de albarán, o mismo IBAN + mismo importe total.
+ * Misma idea que la RPC find_duplicates: mismo NIF + misma fecha, o mismo nº de albarán.
  */
 export type DupClusterContract = {
   id: string;
@@ -16,23 +15,6 @@ export type DupClusterContract = {
 function normNif(s: string | null | undefined): string | null {
   if (!s?.trim()) return null;
   return s.toUpperCase().replace(/\s/g, "");
-}
-
-/** Misma normalización que en BD para IBAN. */
-function normIban(s: string | null | undefined): string | null {
-  if (!s?.trim()) return null;
-  return s.toUpperCase().replace(/\s/g, "");
-}
-
-function sameImporte(
-  a: string | number | null | undefined,
-  b: string | number | null | undefined
-): boolean {
-  if (a == null || b == null) return false;
-  const x = typeof a === "number" ? a : Number(String(a));
-  const y = typeof b === "number" ? b : Number(String(b));
-  if (Number.isNaN(x) || Number.isNaN(y)) return false;
-  return x === y;
 }
 
 export function duplicatePairWithinBatch(a: DupClusterContract, b: DupClusterContract): boolean {
@@ -53,16 +35,6 @@ export function duplicatePairWithinBatch(a: DupClusterContract, b: DupClusterCon
   const alb = b.num_albaran?.trim() ?? null;
   if (ala && alb && ala === alb) return true;
 
-  const ia = normIban(a.iban);
-  const ib = normIban(b.iban);
-  if (
-    ia &&
-    ib &&
-    ia === ib &&
-    sameImporte(a.importe_total, b.importe_total)
-  ) {
-    return true;
-  }
   return false;
 }
 

@@ -51,8 +51,6 @@ export default async function ReviewPage() {
         p_fecha_promocion: (c.fecha_promocion as string | null) ?? null,
         p_num_albaran: (c.num_albaran as string | null) ?? null,
         p_exclude_id: c.id as string,
-        p_iban: (c.iban as string | null) ?? null,
-        p_importe_total: (c.importe_total as number | null) ?? null,
       });
       const { data: signed } = await supabase.storage
         .from("contracts")

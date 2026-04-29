@@ -113,8 +113,6 @@ async function processJob(job: any): Promise<void> {
     p_fecha_promocion: extracted.fecha_promocion ?? null,
     p_num_albaran: extracted.num_albaran ?? null,
     p_exclude_id: null,
-    p_iban: extracted.iban ?? null,
-    p_importe_total: extracted.importe_total ?? null,
   });
   const hasDups = (dups ?? []).length > 0;
   const lowConfidence = (extracted.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD;
