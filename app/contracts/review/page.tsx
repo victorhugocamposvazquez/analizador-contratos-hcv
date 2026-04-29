@@ -10,10 +10,12 @@ export default async function ReviewPage() {
 
   const { data: rawNeeds } = await supabase
     .from("contracts")
-    .select(`
+    .select(
+      `
       *,
-      jobs ( original_filename )
-    `)
+      jobs!contracts_job_id_fkey ( original_filename )
+    `
+    )
     .eq("status", "needs_review")
     .order("created_at", { ascending: true });
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import LogoutButton from "@/components/LogoutButton";
 import NavTabs from "@/components/NavTabs";
+import ContractsLiveRefresh from "@/components/ContractsLiveRefresh";
 
 export default async function ContractsLayout({
   children,
@@ -39,6 +40,7 @@ export default async function ContractsLayout({
         </div>
         <NavTabs reviewCount={reviewCount ?? 0} jobsActive={jobsActive ?? 0} />
       </header>
+      <ContractsLiveRefresh />
       <main className="max-w-6xl mx-auto px-6 py-6">{children}</main>
     </div>
   );

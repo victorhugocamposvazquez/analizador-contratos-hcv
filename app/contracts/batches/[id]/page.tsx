@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import BatchAutoRefresh from "@/components/BatchAutoRefresh";
 import { formatDate, displayFilename } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +46,6 @@ export default async function BatchDetail({
 
   return (
     <div className="space-y-4">
-      {inProgress && <BatchAutoRefresh />}
-
       <div className="flex items-center justify-between">
         <Link
           href="/contracts/batches"

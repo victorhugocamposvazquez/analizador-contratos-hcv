@@ -17,8 +17,10 @@ export default async function ContractsPage({
   let query = supabase
     .from("contracts")
     .select(
-      `id, num_albaran, fecha_promocion, nombre, apellido_1, apellido_2, nif, importe_total, marked_duplicate, status, created_at, original_filename, storage_path,
-      jobs ( original_filename )`
+      `
+      id, num_albaran, fecha_promocion, nombre, apellido_1, apellido_2, nif, importe_total, marked_duplicate, status, created_at, original_filename, storage_path,
+      jobs!contracts_job_id_fkey ( original_filename )
+    `
     )
     .in("status", ["auto_saved", "confirmed"])
     .order("created_at", { ascending: false })
