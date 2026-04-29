@@ -20,6 +20,45 @@ export function formatMoney(n: number | null | undefined): string {
   }).format(n);
 }
 
+/** Nombre mostrable: nombre en `contracts` o último segmento del path en bucket. */
+export function displayFilename(
+  originalFilename: string | null | undefined,
+  storagePath: string
+): string {
+  const t = originalFilename?.trim();
+  if (t) return t;
+  const last = storagePath.split("/").filter(Boolean).pop();
+  return last || storagePath;
+}
+
+/** `original_filename` devuelto al embebido `jobs(...)` en la query de Supabase. */
+export function originalFilenameFromJobEmbed(jobsField: unknown): string | null {
+  if (jobsField == null) return null;
+  if (Array.isArray(jobsField)) {
+    const row = jobsField[0] as
+      | { original_filename?: string | null }
+      | undefined;
+    return row?.original_filename?.trim() ?? null;
+  }
+  return (
+    (jobsField as { original_filename?: string | null }).original_filename?.trim() ??
+    null
+  );
+}
+
+/** Fila contrato+jobs embebidos: muestra nombre real incluso si aún no hay columna rellena en BD. */
+export function displayFilenameResolved(row: {
+  original_filename?: string | null;
+  storage_path: string;
+  jobs?: unknown;
+}): string {
+  const merged =
+    row.original_filename?.trim() ||
+    originalFilenameFromJobEmbed(row.jobs) ||
+    null;
+  return displayFilename(merged, row.storage_path);
+}
+
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

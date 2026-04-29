@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatDate, formatMoney } from "@/lib/utils";
-import { AlertTriangle, Check, Loader2, Trash2, X } from "lucide-react";
+import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
+import { AlertTriangle, Check, Loader2, Trash2 } from "lucide-react";
 
 type Item = {
   contract: any;
@@ -82,13 +82,30 @@ export default function ReviewClient({ items }: { items: Item[] }) {
     current.contract.extraction_confidence != null &&
     current.contract.extraction_confidence < 0.7;
 
+  const fotoNombre = displayFilename(
+    current.contract.original_filename,
+    current.contract.storage_path
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between bg-white border rounded-2xl px-4 py-2 shadow-sm">
-        <div className="text-sm">
-          Revisando <strong>{idx + 1}</strong> de <strong>{total}</strong>
+      <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+        <div className="border-b px-4 py-3 bg-slate-50">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Foto original
+          </p>
+          <p
+            className="mt-1 text-sm font-mono text-slate-900 break-all leading-snug"
+            title={fotoNombre}
+          >
+            {fotoNombre}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-4 py-2 gap-4 flex-wrap">
+          <div className="text-sm shrink-0">
+            Revisando <strong>{idx + 1}</strong> de <strong>{total}</strong>
+          </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setIdx(Math.max(0, idx - 1))}
             disabled={idx === 0 || busy}
@@ -104,19 +121,22 @@ export default function ReviewClient({ items }: { items: Item[] }) {
             Saltar →
           </button>
         </div>
+        </div>
       </div>
 
       <div className="bg-white border rounded-2xl shadow-sm overflow-hidden grid md:grid-cols-2">
-        <div className="bg-slate-100 border-r p-4 flex items-start justify-center">
-          {current.imageUrl ? (
-            <img
-              src={current.imageUrl}
-              alt="albarán"
-              className="max-h-[700px] w-auto rounded-md shadow"
-            />
-          ) : (
-            <p className="text-sm text-slate-500">Imagen no disponible</p>
-          )}
+        <div className="bg-slate-100 border-r p-4 flex flex-col items-start gap-2">
+          <div className="flex flex-1 w-full items-start justify-center min-h-[200px]">
+            {current.imageUrl ? (
+              <img
+                src={current.imageUrl}
+                alt={`Foto original: ${fotoNombre}`}
+                className="max-h-[700px] w-auto rounded-md shadow"
+              />
+            ) : (
+              <p className="text-sm text-slate-500">Imagen no disponible</p>
+            )}
+          </div>
         </div>
 
         <div className="p-5 space-y-4 max-h-[700px] overflow-y-auto">

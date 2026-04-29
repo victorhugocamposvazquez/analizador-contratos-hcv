@@ -14,6 +14,8 @@ type UploadState = {
   active: boolean;
   batchId?: string;
   error?: string;
+  /** Nombre de cada archivo durante la subida; ok null = pendiente */
+  fileRows?: Array<{ name: string; ok: boolean | null }>;
 };
 
 export default function BulkUploader() {
@@ -40,11 +42,13 @@ export default function BulkUploader() {
   }
 
   async function uploadAll(files: File[]) {
+    const fileRowsInit = files.map((f) => ({ name: f.name, ok: null as boolean | null }));
     setState({
       total: files.length,
       uploaded: 0,
       failed: 0,
       active: true,
+      fileRows: fileRowsInit,
     });
 
     // 1. Crear batch
@@ -75,13 +79,14 @@ export default function BulkUploader() {
     }
 
     // 2. Subir archivos en paralelo limitado y crear job por cada uno
-    const queue = [...files];
+    const queue = files.map((f, i) => ({ file: f, index: i }));
     let uploaded = 0;
     let failed = 0;
 
     async function worker() {
       while (queue.length) {
-        const f = queue.shift()!;
+        const { file: f, index } = queue.shift()!;
+        let rowOk = false;
         try {
           const ext = f.name.split(".").pop() || "jpg";
           const path = `${user!.id}/${batch_id}/${crypto.randomUUID()}.${ext}`;
@@ -98,12 +103,20 @@ export default function BulkUploader() {
           });
           if (jobErr) throw jobErr;
 
+          rowOk = true;
           uploaded++;
         } catch (e) {
           console.error("upload failed", f.name, e);
           failed++;
         } finally {
-          setState((s) => ({ ...s, uploaded, failed }));
+          setState((s) => ({
+            ...s,
+            uploaded,
+            failed,
+            fileRows: s.fileRows?.map((row, idx) =>
+              idx === index ? { ...row, ok: rowOk } : row
+            ),
+          }));
         }
       }
     }
@@ -172,6 +185,29 @@ export default function BulkUploader() {
               style={{ width: `${pct}%` }}
             />
           </div>
+          {state.fileRows && state.fileRows.length > 0 && (
+            <ul className="max-h-52 overflow-y-auto rounded-lg border bg-slate-50 text-xs divide-y">
+              {state.fileRows.map((r, i) => (
+                <li
+                  key={`${r.name}-${i}`}
+                  className="flex items-center gap-2 px-2 py-1.5"
+                >
+                  <span className="truncate flex-1" title={r.name}>
+                    {r.name}
+                  </span>
+                  <span className="shrink-0 text-slate-500">
+                    {r.ok === null && "…"}
+                    {r.ok === true && (
+                      <span className="text-emerald-600">✓ Subido</span>
+                    )}
+                    {r.ok === false && (
+                      <span className="text-red-600">Error</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           {!state.active && state.batchId && (
             <div className="flex items-center gap-3 pt-2 text-sm">
               <a
@@ -182,7 +218,13 @@ export default function BulkUploader() {
               </a>
               <button
                 onClick={() =>
-                  setState({ total: 0, uploaded: 0, failed: 0, active: false })
+                  setState({
+                    total: 0,
+                    uploaded: 0,
+                    failed: 0,
+                    active: false,
+                    fileRows: undefined,
+                  })
                 }
                 className="ml-auto text-slate-500 hover:text-slate-800"
               >

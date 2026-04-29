@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import Link from "next/link";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { displayFilenameResolved, formatDate, formatMoney } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import BulkUploader from "@/components/BulkUploader";
 
@@ -17,7 +17,8 @@ export default async function ContractsPage({
   let query = supabase
     .from("contracts")
     .select(
-      "id, num_albaran, fecha_promocion, nombre, apellido_1, apellido_2, nif, importe_total, marked_duplicate, status, created_at"
+      `id, num_albaran, fecha_promocion, nombre, apellido_1, apellido_2, nif, importe_total, marked_duplicate, status, created_at, original_filename, storage_path,
+      jobs ( original_filename )`
     )
     .in("status", ["auto_saved", "confirmed"])
     .order("created_at", { ascending: false })
@@ -25,7 +26,14 @@ export default async function ContractsPage({
 
   if (q) {
     query = query.or(
-      `nif.ilike.%${q}%,num_albaran.ilike.%${q}%,nombre.ilike.%${q}%,apellido_1.ilike.%${q}%,apellido_2.ilike.%${q}%`
+      [
+        `nif.ilike.%${q}%`,
+        `num_albaran.ilike.%${q}%`,
+        `nombre.ilike.%${q}%`,
+        `apellido_1.ilike.%${q}%`,
+        `apellido_2.ilike.%${q}%`,
+        `original_filename.ilike.%${q}%`,
+      ].join(",")
     );
   }
 
@@ -42,7 +50,7 @@ export default async function ContractsPage({
             <input
               name="q"
               defaultValue={q}
-              placeholder="Buscar por NIF, albarán o nombre…"
+              placeholder="Buscar por NIF, albarán, nombre o nombre de foto…"
               className="rounded-lg border px-3 py-1.5 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </form>
@@ -58,6 +66,9 @@ export default async function ContractsPage({
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <th className="text-left px-4 py-2 font-medium">
+                    Archivo original
+                  </th>
                   <th className="text-left px-4 py-2 font-medium">Albarán</th>
                   <th className="text-left px-4 py-2 font-medium">Fecha</th>
                   <th className="text-left px-4 py-2 font-medium">Cliente</th>
@@ -74,6 +85,14 @@ export default async function ContractsPage({
                     .join(" ");
                   return (
                     <tr key={c.id} className="border-t hover:bg-slate-50">
+                      <td className="px-4 py-2">
+                        <div
+                          className="font-mono text-xs text-slate-800 whitespace-normal break-words max-w-[min(22rem,40vw)]"
+                          title={displayFilenameResolved(c)}
+                        >
+                          {displayFilenameResolved(c)}
+                        </div>
+                      </td>
                       <td className="px-4 py-2 font-mono">
                         {c.num_albaran || "—"}
                       </td>

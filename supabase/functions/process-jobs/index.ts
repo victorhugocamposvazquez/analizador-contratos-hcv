@@ -126,6 +126,7 @@ async function processJob(job: any): Promise<void> {
       storage_path: job.storage_path,
       batch_id: job.batch_id,
       job_id: job.id,
+      original_filename: job.original_filename ?? null,
       status,
       extraction_raw: extracted,
       extraction_confidence: extracted.confidence ?? null,

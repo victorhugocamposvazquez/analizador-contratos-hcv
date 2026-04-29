@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
 import DeleteButton from "@/components/DeleteButton";
 import Link from "next/link";
 
@@ -38,7 +38,14 @@ export default async function ContractDetail({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-white border rounded-2xl p-3">
+        <div className="bg-white border rounded-2xl p-3 space-y-2">
+          <p
+            className="text-xs text-slate-500 px-1 break-all"
+            title={displayFilename(c.original_filename, c.storage_path)}
+          >
+            <span className="font-medium text-slate-700">Archivo: </span>
+            {displayFilename(c.original_filename, c.storage_path)}
+          </p>
           {signed?.signedUrl ? (
             <img
               src={signed.signedUrl}
