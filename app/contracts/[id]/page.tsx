@@ -4,6 +4,7 @@ import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
 import { validateSpanishPersonalId } from "@/lib/spanish-id";
 import { urlSegmentForNormalizedLocality } from "@/lib/locality-url";
 import DeleteButton from "@/components/DeleteButton";
+import ContractLocalidadEditor from "@/components/ContractLocalidadEditor";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -92,19 +93,12 @@ export default async function ContractDetail({
               Marcado como posible duplicado al guardar
             </p>
           )}
-          {(c.status === "auto_saved" || c.status === "confirmed") && (
-            <p className="text-sm">
-              <Link
-                href={localityFolderHref}
-                className="text-slate-800 underline underline-offset-2 hover:no-underline"
-              >
-                Abrir carpeta de esta localidad
-              </Link>
-              {typeof c.localidad === "string" && c.localidad.trim()
-                ? ` · ${c.localidad.trim()}`
-                : " · sin localidad registrada"}
-            </p>
-          )}
+          <ContractLocalidadEditor
+            contractId={c.id}
+            initialLocalidad={(c.localidad as string | null) ?? null}
+            localityFolderHref={localityFolderHref}
+            showFolderHint={c.status === "auto_saved" || c.status === "confirmed"}
+          />
           <Field label="Cliente" value={fullName || "—"} />
           <div>
             <p
