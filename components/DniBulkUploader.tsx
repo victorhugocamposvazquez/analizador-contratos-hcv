@@ -309,17 +309,27 @@ export default function DniBulkUploader() {
         total_files: toUpload.length,
       }),
     });
+    const batchPayload = await batchResp.json().catch(() => null);
     if (!batchResp.ok) {
+      let errMsg = "No se pudo crear el lote";
+      if (
+        batchPayload &&
+        typeof batchPayload === "object" &&
+        "error" in batchPayload &&
+        typeof (batchPayload as { error?: unknown }).error === "string"
+      ) {
+        errMsg = (batchPayload as { error: string }).error;
+      }
       setState((s) => ({
         ...s,
         active: false,
         phase: "done",
-        error: "No se pudo crear el lote",
+        error: errMsg,
       }));
       pendingRef.current = null;
       return;
     }
-    const { batch_id } = await batchResp.json();
+    const { batch_id } = batchPayload as { batch_id: string };
 
     const {
       data: { user },
