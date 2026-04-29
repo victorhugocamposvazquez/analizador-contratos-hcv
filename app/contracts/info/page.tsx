@@ -151,12 +151,17 @@ export default function ContractsInfoPage() {
           IA que analiza las imágenes
         </h2>
         <p className="text-sm text-slate-700 leading-relaxed">
-          Esta aplicación usa el modelo multimodal{" "}
-          <strong>Anthropic Claude</strong>, en esta base de código con la variante configurada tipo{" "}
-          <strong>Sonnet 4.6</strong> desde la función de procesamiento. No es un motor OCR
-          clásico aislado: el modelo interpreta la imagen como si leyeras tú la hoja de
-          albarán y rellena un JSON con campo <code>confidence</code> (0 a 1) y notas cuando
-          tenga reservas.
+          Este proyecto usa <strong>Anthropic Claude Sonnet 4.6</strong>: por su equilibrio
+          entre capacidad multimodal en español, legibilidad de manuscritos y costes
+          tratables sobre API, es el modelo de IA <strong>más avanzado</strong> elegido aquí para
+          esta <strong>tarea concreta de extracción de datos</strong> desde las fotos de
+          albarán. No es un OCR clásico aislado: interpreta la hoja como un lector humano y
+          devuelve un JSON con campo <code>confidence</code> (0 a 1) y notas cuando tenga reservas.
+        </p>
+        <p className="text-sm text-slate-700 leading-relaxed mt-3 border-l-2 border-amber-200 pl-3">
+          Igualmente tiene <strong>errores y limitaciones inevitables</strong>: fotos truncas,
+          solapamiento de texto, ambigüedad en cifras o en el papel arrugado pueden dar lecturas
+          incorrectas parciales; la confianza que declara es orientativa y la revisión humana sigue siendo necesaria cuando el negocio lo exija.
         </p>
         <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1.5 mt-3 leading-relaxed">
           <li>
