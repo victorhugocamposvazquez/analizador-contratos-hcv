@@ -31,10 +31,13 @@ export default async function ReviewPage() {
 
   if (!needsReview.length) {
     return (
-      <div className="bg-white border rounded-2xl shadow-sm p-12 text-center text-slate-500">
-        🎉 Nada pendiente de revisar.{" "}
-        <Link href="/contracts" className="underline">
-          Ver listado
+      <div className="bg-white border rounded-2xl shadow-sm p-12 text-center space-y-3 max-w-lg mx-auto">
+        <p className="text-lg text-slate-800 font-medium">No hay nada pendiente de revisión</p>
+        <p className="text-sm text-slate-600 leading-relaxed">
+          Cuando haya fotos con posibles duplicados o lectura dudosa, aparecerán aquí.
+        </p>
+        <Link href="/contracts" className="text-slate-900 font-medium underline text-sm inline-block">
+          Ir al listado de contratos guardados
         </Link>
       </div>
     );
