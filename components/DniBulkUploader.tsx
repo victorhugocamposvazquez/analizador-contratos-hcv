@@ -392,18 +392,36 @@ export default function DniBulkUploader() {
       body: JSON.stringify({ hashes: uniqueHashes }),
     });
 
+    const checkPayload = await check.json().catch(() => null);
+
     if (!check.ok) {
+      let errMsg =
+        "No se pudo comprobar fotos ya subidas. Revisa la sesión e inténtalo otra vez.";
+      if (check.status === 401) {
+        errMsg =
+          "Sesión caducada o no iniciada. Vuelve a entrar e inténtalo de nuevo.";
+      } else if (
+        checkPayload &&
+        typeof checkPayload === "object" &&
+        "error" in checkPayload &&
+        typeof (checkPayload as { error?: unknown }).error === "string"
+      ) {
+        errMsg = (checkPayload as { error: string }).error;
+      }
       setState((s) => ({
         ...s,
         active: false,
         phase: "done",
-        error:
-          "No se pudo comprobar fotos ya subidas. Revisa la sesión e inténtalo otra vez.",
+        error: errMsg,
       }));
       return;
     }
 
-    const { existing } = await check.json();
+    const existing = Array.isArray(
+      (checkPayload as { existing?: unknown } | null)?.existing
+    )
+      ? (checkPayload as { existing: string[] }).existing
+      : [];
     const serverExisting = new Set(
       (existing as string[]).map((x: string) => x.toLowerCase())
     );
@@ -628,8 +646,9 @@ export default function DniBulkUploader() {
           <div className="flex-1">
             <h2 className="font-medium">Subir fotos de DNI/NIE</h2>
             <p className="text-sm text-slate-500">
-              Hasta 1000 imágenes por lote. Detectamos duplicados por SHA-256 igual
-              que en albaranes; podéis forzar resubida desde el diálogo.
+              Hasta miles de imágenes por lote (comprobación de duplicados en el
+              servidor por lotes). Detectamos duplicados por SHA-256 igual que en
+              contratos.
             </p>
           </div>
           <button

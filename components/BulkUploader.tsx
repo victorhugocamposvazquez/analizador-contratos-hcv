@@ -392,18 +392,36 @@ export default function BulkUploader() {
       body: JSON.stringify({ hashes: uniqueHashes }),
     });
 
+    const checkPayload = await check.json().catch(() => null);
+
     if (!check.ok) {
+      let errMsg =
+        "No se pudo comprobar fotos ya subidas. Revisa la sesión e inténtalo otra vez.";
+      if (check.status === 401) {
+        errMsg =
+          "Sesión caducada o no iniciada. Vuelve a entrar e inténtalo de nuevo.";
+      } else if (
+        checkPayload &&
+        typeof checkPayload === "object" &&
+        "error" in checkPayload &&
+        typeof (checkPayload as { error?: unknown }).error === "string"
+      ) {
+        errMsg = (checkPayload as { error: string }).error;
+      }
       setState((s) => ({
         ...s,
         active: false,
         phase: "done",
-        error:
-          "No se pudo comprobar fotos ya subidas. Revisa la sesión e inténtalo otra vez.",
+        error: errMsg,
       }));
       return;
     }
 
-    const { existing } = await check.json();
+    const existing = Array.isArray(
+      (checkPayload as { existing?: unknown } | null)?.existing
+    )
+      ? (checkPayload as { existing: string[] }).existing
+      : [];
     const serverExisting = new Set(
       (existing as string[]).map((x: string) => x.toLowerCase())
     );

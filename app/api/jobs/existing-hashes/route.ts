@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { MAX_HASHES_PER_REQUEST } from "@/lib/existing-hashes-batch";
+import { collectExistingInContractsAndJobs } from "@/lib/collect-existing-hashes";
 
 export const runtime = "nodejs";
 
@@ -11,32 +13,30 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
-  const body = await req.json();
-  const hashes = Array.isArray(body.hashes)
-    ? body.hashes.filter((h: unknown) => typeof h === "string" && /^[a-f0-9]{64}$/i.test(h))
+  const body = (await req.json()) as { hashes?: unknown };
+  const hashes: string[] = Array.isArray(body.hashes)
+    ? body.hashes.filter(
+        (h: unknown): h is string => typeof h === "string" && /^[a-f0-9]{64}$/i.test(h)
+      )
     : [];
   if (hashes.length === 0) {
     return NextResponse.json({ existing: [] as string[] });
   }
-  if (hashes.length > 2000) {
-    return NextResponse.json({ error: "máximo 2000 hashes por petición" }, { status: 400 });
+  if (hashes.length > MAX_HASHES_PER_REQUEST) {
+    return NextResponse.json(
+      { error: `máximo ${MAX_HASHES_PER_REQUEST} hashes por petición (divide la selección o sube por partes)` },
+      { status: 400 }
+    );
   }
 
   const lower = [...new Set(hashes.map((h: string) => h.toLowerCase()))];
 
-  const [jobsRes, contractsRes] = await Promise.all([
-    supabase.from("jobs").select("content_sha256").in("content_sha256", lower),
-    supabase.from("contracts").select("content_sha256").in("content_sha256", lower),
-  ]);
-
-  const found = new Set<string>();
-  for (const row of jobsRes.data ?? []) {
-    const h = (row as { content_sha256: string | null }).content_sha256;
-    if (h) found.add(h.toLowerCase());
-  }
-  for (const row of contractsRes.data ?? []) {
-    const h = (row as { content_sha256: string | null }).content_sha256;
-    if (h) found.add(h.toLowerCase());
+  let found: Set<string>;
+  try {
+    found = await collectExistingInContractsAndJobs(supabase, lower);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 
   return NextResponse.json({ existing: [...found] });
