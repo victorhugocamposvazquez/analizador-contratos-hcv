@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
 import { validateSpanishPersonalId } from "@/lib/spanish-id";
-import { localidadToSlug, SIN_LOCALIDAD_SLUG } from "@/lib/localidades-url";
+import { urlSegmentForNormalizedLocality } from "@/lib/locality-url";
 import DeleteButton from "@/components/DeleteButton";
 import Link from "next/link";
 
@@ -38,6 +38,14 @@ export default async function ContractDetail({
     (c.nif_valid === null &&
       nifStr !== "" &&
       validateSpanishPersonalId(nifStr).valid === false);
+
+  const { data: normRpc } = await supabase.rpc("normalize_locality", {
+    t: (c.localidad as string | null) ?? "",
+  });
+  const localidadNormKey =
+    typeof normRpc === "string" ? normRpc : "";
+
+  const localityFolderHref = `/contracts/locality/${urlSegmentForNormalizedLocality(localidadNormKey)}`;
 
   return (
     <div className="space-y-4">
@@ -87,11 +95,7 @@ export default async function ContractDetail({
           {(c.status === "auto_saved" || c.status === "confirmed") && (
             <p className="text-sm">
               <Link
-                href={`/contracts/localidades/${
-                  typeof c.localidad === "string" && c.localidad.trim() !== ""
-                    ? localidadToSlug(c.localidad)
-                    : SIN_LOCALIDAD_SLUG
-                }`}
+                href={localityFolderHref}
                 className="text-slate-800 underline underline-offset-2 hover:no-underline"
               >
                 Abrir carpeta de esta localidad

@@ -51,10 +51,10 @@ export default async function ContractsPage({
           <h2 className="font-medium">Contratos guardados</h2>
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/contracts/localidades"
+              href="/contracts/locality"
               className="text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
             >
-              Localidades
+              Por localidad
             </Link>
             <form className="flex flex-wrap gap-2 items-center" action="/contracts">
               <input

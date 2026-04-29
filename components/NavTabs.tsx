@@ -24,9 +24,9 @@ export default function NavTabs({
       match: (p: string) => p.startsWith("/contracts/review"),
     },
     {
-      href: "/contracts/localidades",
-      label: "Localidades",
-      match: (p: string) => p.startsWith("/contracts/localidades"),
+      href: "/contracts/locality",
+      label: "Por localidad",
+      match: (p: string) => p.startsWith("/contracts/locality"),
     },
     {
       href: "/contracts/batches",
