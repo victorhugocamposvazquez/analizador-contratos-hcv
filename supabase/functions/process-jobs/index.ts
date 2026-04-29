@@ -155,6 +155,7 @@ async function processJob(job: any): Promise<void> {
       importe_total: extracted.importe_total ?? null,
       num_cuotas: extracted.num_cuotas ?? null,
       cuota_mensual: extracted.cuota_mensual ?? null,
+      content_sha256: job.content_sha256 ?? null,
     })
     .select("id")
     .single();
