@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
+import { validateSpanishPersonalId } from "@/lib/spanish-id";
 import {
   AlertTriangle,
   Check,
@@ -14,6 +15,22 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
+
+function documentClassLabel(dc: string | null | undefined): string {
+  const v = dc ?? "contrato_venta";
+  const map: Record<string, string> = {
+    contrato_venta: "Contrato de venta",
+    documento_otro: "Otro documento",
+    captura_app: "Captura app",
+    ilegible: "Ilegible / no deducible",
+  };
+  return map[v] ?? v;
+}
+
+function normalizeNifUi(s: unknown): string | null {
+  if (s == null || String(s).trim() === "") return null;
+  return String(s).toUpperCase().replace(/\s/g, "");
+}
 
 type Item = {
   contract: any;
@@ -102,12 +119,18 @@ export default function ReviewClient({ items }: { items: Item[] }) {
     current.contract.storage_path
   );
 
+  const documentClass = current.contract.document_class ?? "contrato_venta";
+  const isNonSale = documentClass !== "contrato_venta";
+  const nifNormalized = normalizeNifUi(working.nif);
+  const invalidNifUi =
+    nifNormalized !== null && validateSpanishPersonalId(nifNormalized).valid === false;
+
   return (
     <div className="space-y-3">
       <div className="rounded-xl border bg-white px-3 py-2 sm:px-4 sm:py-2.5 shadow-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-            Foto
+            Foto · {documentClassLabel(documentClass)}
           </p>
           <p
             className="text-sm font-mono text-slate-900 truncate"
@@ -154,12 +177,21 @@ export default function ReviewClient({ items }: { items: Item[] }) {
           </p>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li>
-              <strong className="text-amber-800">Naranja</strong>: otro albarán
-              guardado con el mismo NIF y fecha o el mismo número de albarán.
+              <strong className="text-amber-800">Naranja</strong>: mismo nº de albarán que otro
+              archivo (prioritario), o si falta albarán comparable, mismo NIF + misma fecha de
+              promoción.
             </li>
             <li>
               <strong className="text-blue-800">Azul</strong>: lectura automática{" "}
               <strong>poco segura</strong>; revisad los campos.
+            </li>
+            <li>
+              <strong className="text-red-800">NIF</strong>: letra de control incorrecta (DNI /
+              NIE español); corregid el valor o comprobad el documento.
+            </li>
+            <li>
+              <strong className="text-violet-900">Clasificación</strong>: la IA no considera la
+              foto un contrato de venta; podéis borrar o conservar según archivo interno.
             </li>
           </ul>
         </div>
@@ -186,23 +218,34 @@ export default function ReviewClient({ items }: { items: Item[] }) {
         </div>
 
         <div className="order-1 xl:order-none min-w-0 space-y-3 flex flex-col max-h-none xl:max-h-[min(92vh,920px)] xl:overflow-y-auto xl:pr-1">
+          {isNonSale && (
+            <section className="rounded-xl border-2 border-violet-300 bg-violet-50 p-3 shadow-sm">
+              <p className="font-semibold text-violet-950 text-sm">
+                Esta foto no se clasificó como contrato de venta ({documentClass})
+              </p>
+              <p className="text-xs text-violet-900 mt-1 leading-snug">
+                Los datos debajo pueden estar vacíos; podéis borrarla, archivar como referencia u
+                operar desde vuestro criterio.
+              </p>
+            </section>
+          )}
           <div
             className={
-              lowConf
+              lowConf || invalidNifUi
                 ? "grid grid-cols-1 xl:grid-cols-2 gap-3"
                 : "space-y-3"
             }
           >
             <section
               className={`rounded-xl border-2 p-3 shadow-sm ${
-                hasDups
+                hasDups && !isNonSale
                   ? "border-amber-400 bg-amber-50"
                   : "border-emerald-300 bg-emerald-50/80"
               }`}
             >
               <div className="flex gap-2.5 items-start">
                 <div className="shrink-0">
-                  {hasDups ? (
+                  {hasDups && !isNonSale ? (
                     <Copy
                       className="text-amber-700 w-8 h-8"
                       strokeWidth={1.75}
@@ -218,20 +261,20 @@ export default function ReviewClient({ items }: { items: Item[] }) {
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="font-semibold text-slate-900 text-sm leading-snug">
-                    {hasDups
+                    {hasDups && !isNonSale
                       ? "Sí: parece el mismo caso que otros ya guardados"
                       : "No: por duplicidad no coincide con otros albarán"}
                   </p>
                   <p className="text-xs text-slate-800 leading-snug">
-                    {hasDups ? (
+                    {hasDups && !isNonSale ? (
                       <>
                         Coincidencias ya archivadas debajo; esta foto{" "}
                         <strong>no se archivó sola</strong>.
                       </>
                     ) : (
                       <>
-                        Sin duplicado por datos clave. Si hay aviso azul, la lectura{" "}
-                        <strong>no era segura</strong>.
+                        Sin duplicado por datos clave (albarán prioritario o NIF+fecha si falta
+                        albarán). Si hay aviso azul o rojo, revisad antes de archivar.
                       </>
                     )}
                   </p>
@@ -261,9 +304,26 @@ export default function ReviewClient({ items }: { items: Item[] }) {
                 </div>
               </section>
             )}
+
+            {invalidNifUi && (
+              <section className="rounded-xl border-2 border-red-400 bg-red-50 p-3">
+                <div className="flex gap-2 items-start">
+                  <AlertTriangle
+                    className="text-red-800 shrink-0 mt-0.5"
+                    size={20}
+                  />
+                  <div>
+                    <p className="font-semibold text-red-950 text-sm">NIF / NIE no válido</p>
+                    <p className="text-xs text-red-900 mt-1 leading-snug">
+                      La letra de control no coincide con el número (revisad lectura o documento).
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
 
-          {hasDups && (
+          {hasDups && !isNonSale && (
             <section className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm flex flex-col min-h-0 max-h-[min(38vh,260px)]">
               <h3 className="font-semibold text-amber-950 text-sm flex items-center gap-2 shrink-0">
                 <AlertTriangle size={16} className="text-amber-600 shrink-0" />
@@ -321,7 +381,11 @@ export default function ReviewClient({ items }: { items: Item[] }) {
               <h3 className="font-semibold text-slate-900 text-sm mb-2">
                 Datos leídos de la foto (podéis corregirlos)
               </h3>
-              <FieldsForm fields={working} onUpdate={update} />
+              <FieldsForm
+                fields={working}
+                onUpdate={update}
+                nifInvalid={invalidNifUi}
+              />
             </div>
 
             <section className="pt-3 border-t border-slate-200">
@@ -404,19 +468,30 @@ export default function ReviewClient({ items }: { items: Item[] }) {
 function FieldsForm({
   fields,
   onUpdate,
+  nifInvalid,
 }: {
-  fields: any;
-  onUpdate: (k: string, v: any) => void;
+  fields: Record<string, unknown>;
+  onUpdate: (k: string, v: unknown) => void;
+  nifInvalid?: boolean;
 }) {
   function T(label: string, key: string, type: "text" | "date" = "text") {
+    const isNif = key === "nif";
+    const invalid = isNif && nifInvalid;
     return (
       <label className="block">
-        <span className="text-xs text-slate-500">{label}</span>
+        <span className={`text-xs ${invalid ? "text-red-700 font-medium" : "text-slate-500"}`}>
+          {label}
+        </span>
         <input
           type={type}
-          value={fields[key] ?? ""}
+          value={String(fields[key] ?? "")}
           onChange={(e) => onUpdate(key, e.target.value || null)}
-          className="mt-0.5 w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+          className={
+            invalid
+              ? "mt-0.5 w-full rounded-md border-2 border-red-500 bg-red-50/50 px-2 py-1.5 text-sm text-red-950 focus:outline-none focus:ring-2 focus:ring-red-700"
+              : "mt-0.5 w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+          }
+          aria-invalid={invalid || undefined}
         />
       </label>
     );
@@ -428,7 +503,11 @@ function FieldsForm({
         <input
           type="number"
           step="0.01"
-          value={fields[key] ?? ""}
+          value={
+            fields[key] == null || fields[key] === ""
+              ? ""
+              : String(fields[key] as string | number)
+          }
           onChange={(e) =>
             onUpdate(key, e.target.value === "" ? null : Number(e.target.value))
           }
@@ -459,7 +538,7 @@ function FieldsForm({
         <span className="text-xs text-slate-500">Artículos</span>
         <textarea
           rows={3}
-          value={fields.articulos ?? ""}
+          value={String(fields.articulos ?? "")}
           onChange={(e) => onUpdate("articulos", e.target.value || null)}
           className="mt-0.5 w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
         />

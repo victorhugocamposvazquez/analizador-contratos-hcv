@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
+import { validateSpanishPersonalId } from "@/lib/spanish-id";
 import DeleteButton from "@/components/DeleteButton";
 import Link from "next/link";
 
@@ -27,6 +28,15 @@ export default async function ContractDetail({
   const fullName = [c.nombre, c.apellido_1, c.apellido_2]
     .filter(Boolean)
     .join(" ");
+
+  const dc = (c.document_class as string | null) ?? "contrato_venta";
+  const nifStr =
+    typeof c.nif === "string" ? c.nif.trim().toUpperCase().replace(/\s/g, "") : "";
+  const nifInvalidEffective =
+    c.nif_valid === false ||
+    (c.nif_valid === null &&
+      nifStr !== "" &&
+      validateSpanishPersonalId(nifStr).valid === false);
 
   return (
     <div className="space-y-4">
@@ -58,16 +68,40 @@ export default async function ContractDetail({
         </div>
 
         <div className="bg-white border rounded-2xl p-5 space-y-3">
-          <h1 className="text-xl font-semibold">
-            Albarán #{c.num_albaran || "—"}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold">
+              Albarán #{c.num_albaran || "—"}
+            </h1>
+            {dc !== "contrato_venta" && (
+              <span className="text-xs rounded-md border border-violet-200 bg-violet-50 text-violet-900 px-2 py-0.5">
+                Clasificación: {dc.replace(/_/g, " ")}
+              </span>
+            )}
+          </div>
           {c.marked_duplicate && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 inline-block">
               Marcado como posible duplicado al guardar
             </p>
           )}
           <Field label="Cliente" value={fullName || "—"} />
-          <Field label="NIF" value={c.nif} mono />
+          <div>
+            <p
+              className={
+                nifInvalidEffective ? "text-xs text-red-700 font-medium" : "text-xs text-slate-500"
+              }
+            >
+              NIF
+            </p>
+            <p
+              className={
+                nifInvalidEffective
+                  ? "text-sm mt-1 font-mono text-red-800 font-semibold"
+                  : "text-sm mt-1 font-mono"
+              }
+            >
+              {c.nif || "—"}
+            </p>
+          </div>
           <Field label="Fecha promoción" value={formatDate(c.fecha_promocion)} />
           <Field label="Fecha entrega" value={formatDate(c.fecha_entrega)} />
           <Field label="Hora entrega" value={c.hora_entrega} />

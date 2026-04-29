@@ -1,5 +1,6 @@
 /**
- * Misma idea que la RPC find_duplicates: mismo NIF + misma fecha, o mismo nº de albarán.
+ * Coherente con RPC find_duplicates: prioridad mismo nº de albarán cuando ambos tienen;
+ * si no hay albarán comparable, NIF + misma fecha (solo filas contrato_venta).
  */
 export type DupClusterContract = {
   id: string;
@@ -10,6 +11,7 @@ export type DupClusterContract = {
   importe_total: string | number | null;
   status?: string | null;
   marked_duplicate?: boolean | null;
+  document_class?: string | null;
 };
 
 function normNif(s: string | null | undefined): string | null {
@@ -17,25 +19,41 @@ function normNif(s: string | null | undefined): string | null {
   return s.toUpperCase().replace(/\s/g, "");
 }
 
+function isContratoVenta(c: DupClusterContract): boolean {
+  const d = c.document_class ?? "contrato_venta";
+  return d === "contrato_venta";
+}
+
+function normAlbaran(s: string | null | undefined): string {
+  return (s ?? "").trim();
+}
+
+function oneWayDuplicate(newRow: DupClusterContract, existing: DupClusterContract): boolean {
+  const pAlb = normAlbaran(newRow.num_albaran);
+  const cAlb = normAlbaran(existing.num_albaran);
+  const na = normNif(newRow.nif);
+  const nb = normNif(existing.nif);
+
+  if (pAlb !== "" && cAlb !== "") {
+    return pAlb === cAlb;
+  }
+  if (pAlb === "") {
+    return !!(
+      na &&
+      nb &&
+      newRow.fecha_promocion &&
+      existing.fecha_promocion &&
+      na === nb &&
+      newRow.fecha_promocion === existing.fecha_promocion
+    );
+  }
+  return false;
+}
+
 export function duplicatePairWithinBatch(a: DupClusterContract, b: DupClusterContract): boolean {
   if (a.id === b.id) return false;
-  const na = normNif(a.nif);
-  const nb = normNif(b.nif);
-  if (
-    na &&
-    nb &&
-    a.fecha_promocion &&
-    b.fecha_promocion &&
-    na === nb &&
-    a.fecha_promocion === b.fecha_promocion
-  ) {
-    return true;
-  }
-  const ala = a.num_albaran?.trim() ?? null;
-  const alb = b.num_albaran?.trim() ?? null;
-  if (ala && alb && ala === alb) return true;
-
-  return false;
+  if (!isContratoVenta(a) || !isContratoVenta(b)) return false;
+  return oneWayDuplicate(a, b) || oneWayDuplicate(b, a);
 }
 
 function findRoot(parent: Map<string, string>, x: string): string {

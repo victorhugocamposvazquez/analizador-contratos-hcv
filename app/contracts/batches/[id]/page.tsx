@@ -51,7 +51,7 @@ export default async function BatchDetail({
   const { data: batchContractsRaw } = await supabase
     .from("contracts")
     .select(
-      "id, nif, fecha_promocion, num_albaran, iban, importe_total, original_filename, storage_path, status, marked_duplicate"
+      "id, nif, fecha_promocion, num_albaran, iban, importe_total, original_filename, storage_path, status, marked_duplicate, document_class"
     )
     .eq("batch_id", batch.id);
 
@@ -151,10 +151,10 @@ export default async function BatchDetail({
             Contratos extraídos de este lote
           </h2>
           <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
-            Calculado solo entre las <strong>fotos ya procesadas</strong> de este lote:
-            coincide si comparten mismo NIF y fecha de promoción, el mismo número de
-            albarán, o <strong>mismo IBAN con el mismo importe</strong> — igual que usa
-            la base de datos para alertar duplicados.
+            Calculado solo entre las <strong>fotos ya procesadas</strong> de tipo{" "}
+            <strong>contrato de venta</strong> en este lote: mismo nº de albarán (prioritario
+            cuando ambos tienen nº leído); si falta comparar por albarán, mismo NIF + misma fecha
+            de promoción — alineado con la base de datos.
           </p>
         </div>
         <div className="grid sm:grid-cols-3 gap-4">
@@ -168,7 +168,7 @@ export default async function BatchDetail({
             <p className="text-xs text-emerald-900/85 mt-2 leading-snug">
               Contratos cuya foto{" "}
               <strong>no se parece a ninguna otra</strong> de este mismo envío por
-              datos detectados (NIF+fecha o nº de albarán).
+              datos detectados (nº albarán o, sin albarán, NIF + fecha).
             </p>
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">

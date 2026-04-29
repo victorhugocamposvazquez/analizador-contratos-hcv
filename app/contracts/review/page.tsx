@@ -34,7 +34,7 @@ export default async function ReviewPage() {
       <div className="bg-white border rounded-2xl shadow-sm p-12 text-center space-y-3 max-w-lg mx-auto">
         <p className="text-lg text-slate-800 font-medium">No hay nada pendiente de revisión</p>
         <p className="text-sm text-slate-600 leading-relaxed">
-          Cuando haya fotos con posibles duplicados o lectura dudosa, aparecerán aquí.
+          Cuando haya clasificación fuera de contrato de venta, fotos ilegibles, posibles duplicados, NIF incorrecto según dígito de control u otras alertas pendientes de decisión manual, aparecerán aquí.
         </p>
         <Link href="/contracts" className="text-slate-900 font-medium underline text-sm inline-block">
           Ir al listado de contratos guardados

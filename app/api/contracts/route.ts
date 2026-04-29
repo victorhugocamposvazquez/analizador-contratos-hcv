@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { removeContractStorageFiles } from "@/lib/storage-delete";
+import { validateSpanishPersonalId } from "@/lib/spanish-id";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,12 @@ export async function PATCH(req: NextRequest) {
     ];
     for (const k of allowed) {
       if (k in fields) update[k] = fields[k] === "" ? null : fields[k];
+    }
+    if ("nif" in fields && fields.nif != null && String(fields.nif).trim() !== "") {
+      const normalized = String(fields.nif).toUpperCase().replace(/\s/g, "");
+      update.nif_valid = validateSpanishPersonalId(normalized).valid === true;
+    } else if ("nif" in fields) {
+      update.nif_valid = null;
     }
   }
   if (status) update.status = status; // confirmed | discarded | needs_review

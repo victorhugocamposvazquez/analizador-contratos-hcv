@@ -30,9 +30,11 @@ export default function BatchDuplicateCompareSection({
           Fotos de este lote que coinciden entre sí
         </h2>
         <p className="text-xs text-amber-900/90 mt-1 leading-relaxed max-w-3xl">
-          El sistema agrupa por: mismo NIF + misma fecha, mismo número de albarán, o{" "}
-          <strong>mismo IBAN y mismo importe</strong>. Comparad las imágenes; si solo
-          es repetición por error podéis{" "}
+          El sistema agrupa fotos de <strong>contratos de venta</strong> por:{" "}
+          <strong>mismo número de albarán</strong> (prioritario; ambos con nº leído); si
+          en alguna falta el albarán en los datos, usa <strong>mismo NIF + misma fecha de
+          promoción</strong>. Comparad las imágenes; si solo es repetición por error
+          podéis{" "}
           <Link href="/contracts/review" className="underline font-medium">
             revisar aquí
           </Link>

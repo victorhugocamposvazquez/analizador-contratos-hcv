@@ -4,38 +4,66 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.30.1";
+import { validateSpanishPersonalId } from "../_shared/spanish-id.ts";
 
 const SUPABASE_URL = Deno.env.get("SB_URL")!;
 const SUPABASE_SERVICE_ROLE = Deno.env.get("SB_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 
-// Cuántos jobs procesa cada invocación (cada minuto)
 const BATCH_SIZE = 8;
-// Cuántos en paralelo dentro de la invocación
 const CONCURRENCY = 3;
-// Umbral de confianza por debajo del cual se marca como needs_review
 const LOW_CONFIDENCE_THRESHOLD = 0.7;
 
-const SYSTEM_PROMPT = `Eres un extractor de datos de albaranes/contratos manuscritos de la empresa "Glomark Home".
+const DOCUMENT_CLASSES = [
+  "contrato_venta",
+  "documento_otro",
+  "captura_app",
+  "ilegible",
+] as const;
 
-Cada albarán es un formulario impreso en castellano con campos rellenados a mano. Tu tarea: leer la foto y devolver EXCLUSIVAMENTE un objeto JSON con los campos solicitados, sin texto antes ni después, sin markdown.
+type DocumentClass = (typeof DOCUMENT_CLASSES)[number];
 
-Reglas estrictas:
+function normalizeDocumentClass(raw: unknown): DocumentClass {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if (DOCUMENT_CLASSES.includes(v as DocumentClass)) return v as DocumentClass;
+  return "ilegible";
+}
+
+const SYSTEM_PROMPT = `Eres un clasificador y extractor de documentos relacionados con "Glomark Home".
+
+ANTES QUE NADA clasifica la imagen con el campo "document_class":
+- contrato_venta (Tipo A) — formulario impreso de contrato/albarán de venta que importa para datos de cliente.
+- documento_otro (Tipo B) — encuestas, fichas, recortes sin el formulario de venta esperado u otro papel.
+- captura_app (Tipo C) — foto de pantalla de móvil u ordenador, no papel escaneado.
+- ilegible — foto borrosa, demasiado recortada, sobreexpuesta u otra causa que impida leer con garantías.
+
+IMPORTANTE sobre document_class:
+- Si NO es inequívocamente contrato_venta, NO lo marques como contrato_venta por defecto; ante duda usa documento_otro o ilegible según aplique.
+
+Si document_class ES "contrato_venta", rellena todos los campos de negocio que puedas ver.
+Si document_class NO es "contrato_venta", devuelve null en los campos de negocio (num_albaran, nif, importes…); puedes poner un breve "notes".
+
+Reglas cuando document_class sea "contrato_venta":
 - Si un campo no se ve, no se entiende o está vacío → null. NUNCA inventes.
-- Fechas → formato ISO YYYY-MM-DD. Las fechas suelen aparecer como DD/MM/YY o DD-M-YY (asume siglo XX para años de nacimiento >= 30, siglo XXI para el resto).
+- Fechas → formato ISO YYYY-MM-DD. Las fechas suelen aparecer como DD/MM/YY o DD-MM-YY (asume siglo XX para años de nacimiento >= 30, siglo XXI para el resto).
 - NIF → letras en mayúsculas, sin espacios ni guiones.
 - IBAN → empieza por ES y tiene 24 caracteres. Júntalos sin espacios.
 - num_albaran → el número grande en rojo arriba a la derecha (ej: 3853, 3714).
 - importe_total, num_cuotas, cuota_mensual → números, sin €.
 - articulos → texto libre, una línea por artículo, separados por '\\n'. Mantén la grafía original.
 - estado_civil → "casado", "soltero", "viudo", "divorciado" en minúscula, o null.
-- confidence → tu autoevaluación 0..1 de cómo de seguro estás de la lectura general.
-- notes → si hay algo importante que no has podido leer o tienes dudas, indícalo aquí.
+- confidence → tu autoevaluación 0..1 de la lectura (si no es contrato_venta, refleja confianza en la clasificación).
 
-Responde SOLO el JSON.`;
+JSON obligatorio (incluye siempre document_class y confidence):
+document_class, confidence, notes, num_albaran, fecha_promocion, fecha_entrega, hora_entrega, nombre, apellido_1, apellido_2, nif, telefono, otros_telefonos, fecha_nacimiento, pais_nacimiento, estado_civil, direccion, localidad, cod_postal, provincia, banco, iban, articulos, importe_total, num_cuotas, cuota_mensual
 
-// Campos que el JSON debe contener
-type ExtractedFields = Record<string, any> & { confidence: number };
+Responde SOLO el JSON, sin markdown.`;
+
+type ExtractedFields = Record<string, unknown> & {
+  document_class?: string;
+  confidence?: number;
+  notes?: string | null;
+};
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -43,7 +71,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-/** Base64 sin desplegar todo el buffer en un solo `fromCharCode(...bytes)` (revienta la pila en fotos grandes). */
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   const CHUNK = 8192;
   let binary = "";
@@ -54,13 +81,23 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function processJob(job: any): Promise<void> {
+function str(v: unknown): string | null {
+  if (v == null || v === "") return null;
+  return String(v);
+}
+
+function num(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function processJob(job: Record<string, unknown>): Promise<void> {
   console.log(`[job ${job.id}] start (attempt ${job.attempts})`);
 
-  // 1. Descarga la imagen del bucket
   const { data: blob, error: dlErr } = await supabase.storage
     .from("contracts")
-    .download(job.storage_path);
+    .download(job.storage_path as string);
   if (dlErr || !blob) throw new Error(`download: ${dlErr?.message ?? "no blob"}`);
 
   const buf = new Uint8Array(await blob.arrayBuffer());
@@ -71,9 +108,6 @@ async function processJob(job: any): Promise<void> {
     | "image/webp"
     | "image/gif";
 
-  // 2. Llama a Claude
-  // Modelo: Sonnet 4.6 — el mejor para manuscritos en español a precio razonable.
-  // Si quieres abaratar, cambia a "claude-haiku-4-5" (~3x más barato, algo menos preciso).
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 2000,
@@ -86,13 +120,18 @@ async function processJob(job: any): Promise<void> {
             type: "image",
             source: { type: "base64", media_type: mediaType, data: base64 },
           },
-          { type: "text", text: "Extrae los campos del albarán y devuélvelos como JSON." },
+          {
+            type: "text",
+            text: "Clasifica el documento y, solo si es contrato_venta, extrae los campos como JSON único.",
+          },
         ],
       },
     ],
   });
 
-  const textBlock = msg.content.find((b: any) => b.type === "text") as any;
+  const textBlock = msg.content.find((b: { type: string }) => b.type === "text") as
+    | { text?: string }
+    | undefined;
   if (!textBlock) throw new Error("Modelo no devolvió texto");
 
   const cleaned = String(textBlock.text || "")
@@ -107,19 +146,73 @@ async function processJob(job: any): Promise<void> {
     throw new Error(`JSON inválido: ${cleaned.slice(0, 200)}`);
   }
 
-  // 3. Buscar duplicados
+  const documentClass = normalizeDocumentClass(extracted.document_class);
+
+  if (documentClass !== "contrato_venta") {
+    const kindLabel: Record<DocumentClass, string> = {
+      contrato_venta: "contrato de venta",
+      documento_otro: "documento distinto del formulario",
+      captura_app: "captura de pantalla",
+      ilegible: "ilegible o no válida como formulario",
+    };
+    const head = `No es un contrato de venta — clasificación: ${documentClass} (${kindLabel[documentClass]}).`;
+    const prev = extracted.notes != null ? String(extracted.notes).trim() : "";
+    const notesCombined = prev ? `${head} ${prev}` : head;
+
+    const { data: contract, error: insErr } = await supabase
+      .from("contracts")
+      .insert({
+        created_by: job.created_by as string,
+        storage_path: job.storage_path as string,
+        batch_id: job.batch_id ?? null,
+        job_id: job.id as string,
+        original_filename: (job.original_filename as string | null) ?? null,
+        status: "needs_review",
+        document_class: documentClass,
+        nif_valid: null,
+        extraction_raw: extracted,
+        extraction_confidence:
+          extracted.confidence !== undefined ? Number(extracted.confidence) : null,
+        notes: notesCombined.slice(0, 8000),
+        content_sha256: (job.content_sha256 as string | null) ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (insErr) throw new Error(`insert: ${insErr.message}`);
+
+    await supabase
+      .from("jobs")
+      .update({
+        status: "done",
+        finished_at: new Date().toISOString(),
+        contract_id: contract!.id,
+        last_error: null,
+      })
+      .eq("id", job.id as string);
+
+    console.log(`[job ${job.id}] done → contract ${contract!.id} (needs_review, ${documentClass})`);
+    return;
+  }
+
+  const nifStr = str(extracted.nif);
+  const nifValid = validateSpanishPersonalId(nifStr);
+
   const { data: dups } = await supabase.rpc("find_duplicates", {
-    p_nif: extracted.nif ?? null,
+    p_nif: nifStr ?? null,
     p_fecha_promocion: extracted.fecha_promocion ?? null,
-    p_num_albaran: extracted.num_albaran ?? null,
+    p_num_albaran: str(extracted.num_albaran),
     p_exclude_id: null,
   });
   const hasDups = (dups ?? []).length > 0;
-  const lowConfidence = (extracted.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD;
+  const lowConfidence =
+    extracted.confidence === undefined ||
+    Number(extracted.confidence) < LOW_CONFIDENCE_THRESHOLD;
+  const badNif = nifStr != null && nifStr.length > 0 && nifValid === false;
 
-  const status = hasDups || lowConfidence ? "needs_review" : "auto_saved";
+  const status =
+    hasDups || lowConfidence || badNif ? "needs_review" : "auto_saved";
 
-  // 4. Insertar contrato
   const { data: contract, error: insErr } = await supabase
     .from("contracts")
     .insert({
@@ -129,32 +222,38 @@ async function processJob(job: any): Promise<void> {
       job_id: job.id,
       original_filename: job.original_filename ?? null,
       status,
+      document_class: "contrato_venta",
+      nif_valid: nifStr ? nifValid : null,
       extraction_raw: extracted,
-      extraction_confidence: extracted.confidence ?? null,
-      notes: extracted.notes ?? null,
-      num_albaran: extracted.num_albaran ?? null,
-      fecha_promocion: extracted.fecha_promocion ?? null,
-      fecha_entrega: extracted.fecha_entrega ?? null,
-      hora_entrega: extracted.hora_entrega ?? null,
-      nombre: extracted.nombre ?? null,
-      apellido_1: extracted.apellido_1 ?? null,
-      apellido_2: extracted.apellido_2 ?? null,
-      nif: extracted.nif ?? null,
-      telefono: extracted.telefono ?? null,
-      otros_telefonos: extracted.otros_telefonos ?? null,
-      fecha_nacimiento: extracted.fecha_nacimiento ?? null,
-      pais_nacimiento: extracted.pais_nacimiento ?? null,
-      estado_civil: extracted.estado_civil ?? null,
-      direccion: extracted.direccion ?? null,
-      localidad: extracted.localidad ?? null,
-      cod_postal: extracted.cod_postal ?? null,
-      provincia: extracted.provincia ?? null,
-      banco: extracted.banco ?? null,
-      iban: extracted.iban ?? null,
-      articulos: extracted.articulos ?? null,
-      importe_total: extracted.importe_total ?? null,
-      num_cuotas: extracted.num_cuotas ?? null,
-      cuota_mensual: extracted.cuota_mensual ?? null,
+      extraction_confidence:
+        extracted.confidence !== undefined ? Number(extracted.confidence) : null,
+      notes: str(extracted.notes),
+      num_albaran: str(extracted.num_albaran),
+      fecha_promocion: str(extracted.fecha_promocion),
+      fecha_entrega: str(extracted.fecha_entrega),
+      hora_entrega: str(extracted.hora_entrega),
+      nombre: str(extracted.nombre),
+      apellido_1: str(extracted.apellido_1),
+      apellido_2: str(extracted.apellido_2),
+      nif: nifStr,
+      telefono: str(extracted.telefono),
+      otros_telefonos: str(extracted.otros_telefonos),
+      fecha_nacimiento: str(extracted.fecha_nacimiento),
+      pais_nacimiento: str(extracted.pais_nacimiento),
+      estado_civil: str(extracted.estado_civil),
+      direccion: str(extracted.direccion),
+      localidad: str(extracted.localidad),
+      cod_postal: str(extracted.cod_postal),
+      provincia: str(extracted.provincia),
+      banco: str(extracted.banco),
+      iban: str(extracted.iban),
+      articulos: str(extracted.articulos),
+      importe_total: num(extracted.importe_total),
+      num_cuotas:
+        extracted.num_cuotas == null || extracted.num_cuotas === ""
+          ? null
+          : Math.trunc(Number(extracted.num_cuotas)),
+      cuota_mensual: num(extracted.cuota_mensual),
       content_sha256: job.content_sha256 ?? null,
     })
     .select("id")
@@ -162,7 +261,6 @@ async function processJob(job: any): Promise<void> {
 
   if (insErr) throw new Error(`insert: ${insErr.message}`);
 
-  // 5. Marcar job como done
   await supabase
     .from("jobs")
     .update({
@@ -171,7 +269,7 @@ async function processJob(job: any): Promise<void> {
       contract_id: contract!.id,
       last_error: null,
     })
-    .eq("id", job.id);
+    .eq("id", job.id as string);
 
   console.log(`[job ${job.id}] done → contract ${contract!.id} (${status})`);
 }
@@ -187,7 +285,7 @@ async function processInPool<T>(
       const item = queue.shift()!;
       try {
         await worker(item);
-      } catch (e) {
+      } catch (_) {
         // Manejado dentro de processOneSafely
       }
     }
@@ -195,13 +293,14 @@ async function processInPool<T>(
   await Promise.all(runners);
 }
 
-async function processOneSafely(job: any) {
+async function processOneSafely(job: Record<string, unknown>) {
   try {
     await processJob(job);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[job ${job.id}] error: ${msg}`);
-    const finalStatus = job.attempts >= 3 ? "failed" : "pending"; // se reintenta
+    const attempts = Number(job.attempts);
+    const finalStatus = attempts >= 3 ? "failed" : "pending";
     await supabase
       .from("jobs")
       .update({
@@ -209,11 +308,11 @@ async function processOneSafely(job: any) {
         last_error: msg,
         finished_at: finalStatus === "failed" ? new Date().toISOString() : null,
       })
-      .eq("id", job.id);
+      .eq("id", job.id as string);
   }
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (_req: Request) => {
   const { data: jobs, error } = await supabase.rpc("claim_jobs", { p_limit: BATCH_SIZE });
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
@@ -228,8 +327,8 @@ Deno.serve(async (_req) => {
 
   await processInPool(list, processOneSafely, CONCURRENCY);
 
-  return new Response(
-    JSON.stringify({ processed: list.length }),
-    { status: 200, headers: { "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ processed: list.length }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 });

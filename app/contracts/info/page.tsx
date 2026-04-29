@@ -24,9 +24,15 @@ export default function ContractsInfoPage() {
             Glomark Home manuscritos) en almacenamiento privado en la nube.
           </li>
           <li>
-            <strong>Extracción automática de datos</strong> desde cada imagen:
-            nombre, NIF, albarán, importes, IBAN, texto de artículos, etc., según
-            el formato del modelo.
+            <strong>Clasificación de la foto</strong> (contrato de venta, otro documento,
+            captura de app, ilegible): solo las filas clasificadas como contrato de venta
+            siguen el flujo habitual de extracción de campos; el resto pasan a revisión con
+            una nota y la imagen guardada.
+          </li>
+          <li>
+            <strong>Extracción automática de datos</strong> desde cada imagen (si aplica):
+            nombre, NIF, albarán, importes, IBAN, texto de artículos, etc., según el formato
+            del modelo.
           </li>
           <li>
             <strong>Detección de posibles duplicados</strong> contra contratos ya
@@ -63,14 +69,16 @@ export default function ContractsInfoPage() {
             Una <strong>Edge Function</strong> en Supabase (Deno), invocada de forma
             periódica, reclama trabajos, descarga la imagen del bucket y envía la imagen al
             servicio de <strong>Anthropic (Claude)</strong> en modo mensaje con imagen más
-            instrucciones fijas para obtener un único objeto JSON por albarán.
+            instrucciones fijas: primero <strong>clasifica</strong> el tipo de documento y,
+            si corresponde, devuelve un único objeto JSON con los campos del albarán de venta.
           </li>
           <li>
-            Se guarda una fila de <strong>contrato</strong> con esos campos,
-            huella opcional del fichero cuando exista en el job y el resultado de una
-            comprobación de duplicidad en base de datos. Si no hay problema claro ni
-            confianza baja por el umbral, el contrato queda archivado automáticamente;
-            si no, pasa a <strong>Por revisar</strong>.
+            Se guarda una fila de <strong>contrato</strong> con esos datos o, si no es venta,
+            un registro mínimo y nota. Además se valida el dígito/letra del{" "}
+            <strong>NIF o NIE español</strong>, se calcula duplicidad y, si no hay problema
+            grave (umbral de confianza, NIF inválido, duplicado u otra razón de revisión),
+            el contrato de venta puede quedar archivado automáticamente; si no, pasa a{" "}
+            <strong>Por revisar</strong>.
           </li>
           <li>
             En revisión una persona corrige valores, guarda, marca duplicidad o borra según el
@@ -86,24 +94,34 @@ export default function ContractsInfoPage() {
         <dl className="text-sm text-slate-700 space-y-3 leading-relaxed">
           <div>
             <dt className="font-medium text-slate-800">
+              Tipo de foto (antes de extraer datos de negocio)
+            </dt>
+            <dd className="mt-1">
+              La IA clasifica cada imagen (contrato de venta, otro documento, captura de móvil,
+              ilegible, etc.). Solo las filas clasificadas como <strong>contrato de venta</strong>{" "}
+              pasan a tener rellenados los campos habituales del albarán; el resto quedan en{" "}
+              <strong>Por revisar</strong> con una nota aclaratoria y la foto conservada.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-slate-800">
               Posibles duplicados (base de datos)
             </dt>
             <dd className="mt-1">
-              Se marca coincidencia con contratos ya guardados si vale{" "}
-              <strong>cualquiera</strong> de estos criterios: mismo{" "}
-              <strong>NIF y misma fecha de promoción</strong>; o mismo{" "}
-              <strong>número de albarán</strong>, tal como están guardados tras
-              normalizar donde aplica. No hay prioridad “primero uno y luego otro”: con
-              que se cumpla una relación, entra en la búsqueda de duplicados.
+              Solo se buscan duplicados entre filas de contrato de venta. Si la lectura trae{" "}
+              <strong>número de albarán</strong> en ambos lados, el criterio principal es el{" "}
+              <strong>mismo nº de albarán</strong> (impreso, más fiable que el NIF manuscrito).
+              Si falta el albarán en la comparación, se usa{" "}
+              <strong>mismo NIF y misma fecha de promoción</strong> como apoyo.
             </dd>
           </div>
           <div>
             <dt className="font-medium text-slate-800">Revisión obligatoria</dt>
             <dd className="mt-1">
-              Un contrato pasa a <strong>Por revisar</strong> si hay coincidencias de
-              duplicado <strong>o</strong> la confianza global que devuelve el modelo en el
-              JSON está por debajo del umbral configurado (en el código, por debajo del
-              70%).
+              Un contrato de venta pasa a <strong>Por revisar</strong> si hay coincidencias de
+              duplicado, si la confianza global del modelo está por debajo del umbral (en el
+              código, 70%), o si el <strong>NIF o NIE tiene letra incorrecta</strong> según el
+              algoritmo de comprobación habitual (módulo 23).
             </dd>
           </div>
           <div>
