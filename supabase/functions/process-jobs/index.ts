@@ -4,7 +4,38 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.30.1";
-import { validateSpanishPersonalId } from "../_shared/spanish-id.ts";
+
+/* DNI/NIE (módulo 23) — empaquetado en un solo archivo (el deploy remoto no incluye ./spanish-id.ts). Alinear con lib/spanish-id.ts */
+const MOD23_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE";
+
+function niePrefixToDigit(c: string): string {
+  if (c === "X") return "0";
+  if (c === "Y") return "1";
+  if (c === "Z") return "2";
+  return "";
+}
+
+function isValidDni(normalized: string): boolean {
+  if (!/^\d{8}[A-Z]$/.test(normalized)) return false;
+  const num = parseInt(normalized.slice(0, 8), 10);
+  const letter = normalized[8];
+  return MOD23_LETTERS[num % 23] === letter;
+}
+
+function isValidNie(normalized: string): boolean {
+  if (!/^[XYZ]\d{7}[A-Z]$/.test(normalized)) return false;
+  const mapped = niePrefixToDigit(normalized[0]) + normalized.slice(1, 8);
+  const num = parseInt(mapped, 10);
+  const letter = normalized[8];
+  return MOD23_LETTERS[num % 23] === letter;
+}
+
+function validateSpanishPersonalId(normalizedUpper: string | null | undefined): boolean | null {
+  const s = normalizedUpper?.trim() ?? "";
+  if (!s) return null;
+  if (isValidDni(s) || isValidNie(s)) return true;
+  return false;
+}
 
 const SUPABASE_URL = Deno.env.get("SB_URL")!;
 const SUPABASE_SERVICE_ROLE = Deno.env.get("SB_SERVICE_ROLE_KEY")!;

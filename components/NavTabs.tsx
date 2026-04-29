@@ -12,12 +12,21 @@ export default function NavTabs({
 }) {
   const path = usePathname();
   const tabs = [
-    { href: "/contracts", label: "Listado", match: (p: string) => p === "/contracts" },
+    {
+      href: "/contracts",
+      label: "Listado",
+      match: (p: string) => p === "/contracts",
+    },
     {
       href: "/contracts/review",
       label: "Por revisar",
       badge: reviewCount > 0 ? reviewCount : null,
       match: (p: string) => p.startsWith("/contracts/review"),
+    },
+    {
+      href: "/contracts/localidades",
+      label: "Localidades",
+      match: (p: string) => p.startsWith("/contracts/localidades"),
     },
     {
       href: "/contracts/batches",

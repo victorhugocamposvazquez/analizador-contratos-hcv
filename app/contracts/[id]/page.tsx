@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { formatDate, formatMoney, displayFilename } from "@/lib/utils";
 import { validateSpanishPersonalId } from "@/lib/spanish-id";
+import { localidadToSlug, SIN_LOCALIDAD_SLUG } from "@/lib/localidades-url";
 import DeleteButton from "@/components/DeleteButton";
 import Link from "next/link";
 
@@ -81,6 +82,23 @@ export default async function ContractDetail({
           {c.marked_duplicate && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 inline-block">
               Marcado como posible duplicado al guardar
+            </p>
+          )}
+          {(c.status === "auto_saved" || c.status === "confirmed") && (
+            <p className="text-sm">
+              <Link
+                href={`/contracts/localidades/${
+                  typeof c.localidad === "string" && c.localidad.trim() !== ""
+                    ? localidadToSlug(c.localidad)
+                    : SIN_LOCALIDAD_SLUG
+                }`}
+                className="text-slate-800 underline underline-offset-2 hover:no-underline"
+              >
+                Abrir carpeta de esta localidad
+              </Link>
+              {typeof c.localidad === "string" && c.localidad.trim()
+                ? ` · ${c.localidad.trim()}`
+                : " · sin localidad registrada"}
             </p>
           )}
           <Field label="Cliente" value={fullName || "—"} />

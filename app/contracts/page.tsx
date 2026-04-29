@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import BulkUploader from "@/components/BulkUploader";
 import ContractsBulkTable, {
@@ -46,16 +47,24 @@ export default async function ContractsPage({
       <BulkUploader />
 
       <div className="bg-white rounded-2xl border shadow-sm">
-        <div className="px-5 py-4 border-b flex items-center gap-3">
+        <div className="px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Contratos guardados</h2>
-          <form className="ml-auto" action="/contracts">
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Buscar por NIF, albarán, nombre o nombre de foto…"
-              className="rounded-lg border px-3 py-1.5 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          </form>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/contracts/localidades"
+              className="text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
+            >
+              Localidades
+            </Link>
+            <form className="flex flex-wrap gap-2 items-center" action="/contracts">
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Buscar por NIF, albarán, nombre o nombre de foto…"
+                className="rounded-lg border px-3 py-1.5 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+            </form>
+          </div>
         </div>
         {error && <p className="px-5 py-4 text-sm text-red-600">{error.message}</p>}
         {!error && (!contracts || contracts.length === 0) && (

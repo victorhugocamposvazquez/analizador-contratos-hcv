@@ -20,6 +20,7 @@ export type ContractRow = {
   created_at: string;
   original_filename: string | null;
   storage_path: string;
+  localidad?: string | null;
   jobs?: unknown;
 };
 
