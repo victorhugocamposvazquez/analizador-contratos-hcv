@@ -85,6 +85,14 @@ Reglas cuando document_class sea "contrato_venta":
 - estado_civil → "casado", "soltero", "viudo", "divorciado" en minúscula, o null.
 - confidence → tu autoevaluación 0..1 de la lectura (si no es contrato_venta, refleja confianza en la clasificación).
 
+LOCALIDAD, PROVINCIA Y DIRECCIÓN (muy importante — muchas lecturas fallan aquí):
+- "localidad" es el MUNICIPIO / población (ej. Carballo, Santiago de Compostela), no la comunidad autónoma.
+- "provincia" es la provincia administrativa (ej. A Coruña, Pontevedra).
+- En formularios Glomark hay líneas etiquetadas (impreso o a mano): Localidad / Provincia / C. Postal debajo del nombre. La localidad suele ir ESCRITA A MANO (tinta, a veces todo en MAYÚSCULAS). Léela con cuidado incluso si la caligrafía es irregular.
+- NO confundas provincia con localidad: si aparece "Provincia: A CORUÑA" y aparte un campo de localidad con otro nombre (ej. CARBALLO), localidad = ese municipio y provincia = A Coruña.
+- En el PIE del documento suele figurar la frase "En [nombre] a [día] de [mes] de [año]" o similar: el [nombre] entre "En" y "a" casi siempre es la MISMA localidad municipal — úsalo para rellenar "localidad" si el recuadro superior no se lee bien o está vacío en la foto.
+- Si tras revisar imagen y pie sigues sin poder leer la localidad con seguridad, deja localidad en null (no adivines nombres inventados).
+
 JSON obligatorio (incluye siempre document_class y confidence):
 document_class, confidence, notes, num_albaran, fecha_promocion, fecha_entrega, hora_entrega, nombre, apellido_1, apellido_2, nif, telefono, otros_telefonos, fecha_nacimiento, pais_nacimiento, estado_civil, direccion, localidad, cod_postal, provincia, banco, iban, articulos, importe_total, num_cuotas, cuota_mensual
 
@@ -153,7 +161,7 @@ async function processJob(job: Record<string, unknown>): Promise<void> {
           },
           {
             type: "text",
-            text: "Clasifica el documento y, solo si es contrato_venta, extrae los campos como JSON único.",
+            text: 'Clasifica el documento y, solo si es contrato_venta, extrae los campos como JSON único. Antes de cerrar: comprueba el bloque de dirección/localidad/provincia/código postal y el pie "En … a …" para no dejar localidad vacía si el dato es visible en la imagen.',
           },
         ],
       },
@@ -229,6 +237,15 @@ async function processJob(job: Record<string, unknown>): Promise<void> {
   const nifStr = str(extracted.nif);
   const nifValid = validateSpanishPersonalId(nifStr);
 
+  const localidadStr = str(extracted.localidad);
+  const hasAnyAddressHint = Boolean(
+    str(extracted.direccion) ||
+      str(extracted.cod_postal) ||
+      str(extracted.provincia)
+  );
+  /** Evita auto_saved cuando hay señales de domicilio pero falta municipio (fallo típico de OCR en manuscrito). */
+  const missingLocalidadWithAddressContext = !localidadStr && hasAnyAddressHint;
+
   const { data: dups } = await supabase.rpc("find_duplicates", {
     p_nif: nifStr ?? null,
     p_fecha_promocion: extracted.fecha_promocion ?? null,
@@ -242,7 +259,12 @@ async function processJob(job: Record<string, unknown>): Promise<void> {
   const badNif = nifStr != null && nifStr.length > 0 && nifValid === false;
 
   const status =
-    hasDups || lowConfidence || badNif ? "needs_review" : "auto_saved";
+    hasDups ||
+    lowConfidence ||
+    badNif ||
+    missingLocalidadWithAddressContext
+      ? "needs_review"
+      : "auto_saved";
 
   const { data: contract, error: insErr } = await supabase
     .from("contracts")
@@ -273,7 +295,7 @@ async function processJob(job: Record<string, unknown>): Promise<void> {
       pais_nacimiento: str(extracted.pais_nacimiento),
       estado_civil: str(extracted.estado_civil),
       direccion: str(extracted.direccion),
-      localidad: str(extracted.localidad),
+      localidad: localidadStr,
       cod_postal: str(extracted.cod_postal),
       provincia: str(extracted.provincia),
       banco: str(extracted.banco),
