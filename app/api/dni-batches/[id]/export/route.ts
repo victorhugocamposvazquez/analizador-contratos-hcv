@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import {
+  fetchAllDniExtractionsForBatch,
+  fetchAllDniJobsForBatch,
+} from "@/lib/dni-batch-queries";
 
 export const runtime = "nodejs";
 
@@ -22,21 +26,15 @@ export async function GET(
 
   const batchId = context.params.id;
 
-  const { data: jobs, error: e1 } = await supabase
-    .from("dni_jobs")
-    .select("id, original_filename, storage_path, status, last_error, created_at")
-    .eq("batch_id", batchId)
-    .order("created_at", { ascending: true });
+  const { data: jobs, error: e1 } = await fetchAllDniJobsForBatch(supabase, batchId);
+  if (e1) return NextResponse.json({ error: e1 }, { status: 500 });
 
-  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
-
-  const jobIds = (jobs ?? []).map((j) => j.id);
-  const { data: exs, error: e2 } =
-    jobIds.length > 0
-      ? await supabase.from("dni_extractions").select("*").in("dni_job_id", jobIds)
-      : { data: [] as Record<string, unknown>[], error: null };
-
-  if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
+  const { data: exs, error: e2 } = await fetchAllDniExtractionsForBatch(
+    supabase,
+    batchId,
+    "*"
+  );
+  if (e2) return NextResponse.json({ error: e2 }, { status: 500 });
 
   const exByJob = new Map(
     (exs ?? []).map((e) => [e.dni_job_id as string, e] as const)

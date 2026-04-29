@@ -1,3 +1,7 @@
+import {
+  DNI_BATCH_TABLE_MAX_ROWS,
+  fetchDniExtractionsByJobIds,
+} from "@/lib/dni-batch-queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
@@ -41,19 +45,28 @@ export default async function DniBatchDetailPage({
     needs_review: 0,
   };
 
+  /** Una sola consulta acotada: evita payloads RSC gigantes y GET fallidos en Vercel. */
   const { data: jobs } = await supabase
     .from("dni_jobs")
     .select("id, original_filename, storage_path, status, last_error, created_at")
     .eq("batch_id", batch.id)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .range(0, DNI_BATCH_TABLE_MAX_ROWS - 1);
 
   const jid = (jobs ?? []).map((j) => j.id);
-  const { data: extras } =
-    jid.length > 0
-      ? await supabase.from("dni_extractions").select("*").in("dni_job_id", jid)
-      : { data: [] };
-
-  const byJob = new Map((extras ?? []).map((e) => [e.dni_job_id, e]));
+  const extrCols =
+    "dni_job_id, numero_documento, nif_valid, extraction_confidence, status, notes";
+  const { data: extraMap, error: exErr } = await fetchDniExtractionsByJobIds(
+    supabase,
+    batch.id,
+    jid,
+    extrCols
+  );
+  if (exErr) {
+    console.error("[dni batch page] extractions:", exErr);
+  }
+  const byJob = extraMap ?? new Map();
+  const tableTruncated = s.total > DNI_BATCH_TABLE_MAX_ROWS;
 
   const pct = s.total > 0 ? Math.round(((s.done + s.failed) / s.total) * 100) : 0;
   const inProgress = s.pending + s.processing > 0;
@@ -103,6 +116,13 @@ export default async function DniBatchDetailPage({
           <p className="text-xs text-slate-500">
             Importación en proceso (refresco automático cada pocos segundos). Cron: función{" "}
             <code className="text-xs">process-dni-jobs</code>.
+          </p>
+        )}
+        {tableTruncated && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            La tabla muestra solo las primeras <strong>{DNI_BATCH_TABLE_MAX_ROWS}</strong>{" "}
+            filas ({s.total.toLocaleString("es-ES")} en total). Usa «Descargar CSV» para el
+            listado completo.
           </p>
         )}
       </div>
