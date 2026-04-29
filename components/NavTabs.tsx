@@ -12,25 +12,29 @@ export default function NavTabs({
 }) {
   const path = usePathname();
   const tabs = [
-    { href: "/contracts", label: "Listado" },
+    { href: "/contracts", label: "Listado", match: (p: string) => p === "/contracts" },
     {
       href: "/contracts/review",
       label: "Por revisar",
       badge: reviewCount > 0 ? reviewCount : null,
+      match: (p: string) => p.startsWith("/contracts/review"),
     },
     {
       href: "/contracts/batches",
       label: "Lotes",
       badge: jobsActive > 0 ? `${jobsActive} en cola` : null,
+      match: (p: string) => p.startsWith("/contracts/batches"),
+    },
+    {
+      href: "/contracts/info",
+      label: "Información",
+      match: (p: string) => p === "/contracts/info",
     },
   ];
   return (
-    <nav className="max-w-6xl mx-auto px-6 flex gap-1 text-sm">
+    <nav className="max-w-6xl mx-auto px-6 flex gap-1 text-sm flex-wrap">
       {tabs.map((t) => {
-        const active =
-          t.href === "/contracts"
-            ? path === "/contracts"
-            : path.startsWith(t.href);
+        const active = t.match(path);
         return (
           <Link
             key={t.href}

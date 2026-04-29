@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { removeContractStorageFiles } from "@/lib/storage-delete";
 
 export const runtime = "nodejs";
 
-/** Borra lotes y contratos enlazados, luego el lote (jobs en cascade). POST { ids: string[] } */
+/** Borra ficheros de storage de los contratos del lote, luego contratos y lotes. POST { ids: string[] } */
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -21,6 +22,18 @@ export async function POST(req: NextRequest) {
   if (ids.length > 100) {
     return NextResponse.json({ error: "máximo 100 por vez" }, { status: 400 });
   }
+
+  const { data: rows, error: selErr } = await supabase
+    .from("contracts")
+    .select("storage_path")
+    .in("batch_id", ids);
+  if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+
+  const st = await removeContractStorageFiles(
+    supabase,
+    (rows ?? []).map((r) => r.storage_path as string | null)
+  );
+  if (st.error) return NextResponse.json({ error: st.error }, { status: 500 });
 
   const { error: delC } = await supabase.from("contracts").delete().in("batch_id", ids);
   if (delC) return NextResponse.json({ error: delC.message }, { status: 500 });

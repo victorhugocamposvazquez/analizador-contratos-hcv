@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { removeContractStorageFiles } from "@/lib/storage-delete";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,7 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-// Borrar contrato (también borra archivo vía trigger SQL)
+// Borrar contrato: primero el fichero en Storage (API), luego la fila.
 export async function DELETE(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -65,6 +66,17 @@ export async function DELETE(req: NextRequest) {
 
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
+
+  const { data: row, error: selErr } = await supabase
+    .from("contracts")
+    .select("storage_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
+
+  const paths = row?.storage_path ? [row.storage_path as string] : [];
+  const st = await removeContractStorageFiles(supabase, paths);
+  if (st.error) return NextResponse.json({ error: st.error }, { status: 500 });
 
   const { error } = await supabase.from("contracts").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
