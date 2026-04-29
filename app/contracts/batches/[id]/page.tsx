@@ -51,7 +51,7 @@ export default async function BatchDetail({
   const { data: batchContractsRaw } = await supabase
     .from("contracts")
     .select(
-      "id, nif, fecha_promocion, num_albaran, original_filename, storage_path, status, marked_duplicate"
+      "id, nif, fecha_promocion, num_albaran, iban, importe_total, original_filename, storage_path, status, marked_duplicate"
     )
     .eq("batch_id", batch.id);
 
@@ -81,6 +81,8 @@ export default async function BatchDetail({
               num_albaran: c.num_albaran,
               fecha_promocion: c.fecha_promocion,
               nif: c.nif,
+              iban: c.iban,
+              importe_total: c.importe_total,
             };
           })
         )
@@ -150,9 +152,9 @@ export default async function BatchDetail({
           </h2>
           <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
             Calculado solo entre las <strong>fotos ya procesadas</strong> de este lote:
-            coincide si comparten mismo NIF y fecha de promoción o el mismo número de
-            albarán — igual que usa el programa para alertar antes de revisar el resto del
-            histórico.
+            coincide si comparten mismo NIF y fecha de promoción, el mismo número de
+            albarán, o <strong>mismo IBAN con el mismo importe</strong> — igual que usa
+            la base de datos para alertar duplicados.
           </p>
         </div>
         <div className="grid sm:grid-cols-3 gap-4">

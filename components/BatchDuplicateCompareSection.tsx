@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatMoney } from "@/lib/utils";
 export type DuplicateGroupItem = {
   id: string;
   filename: string;
@@ -9,6 +9,8 @@ export type DuplicateGroupItem = {
   num_albaran: string | null;
   fecha_promocion: string | null;
   nif: string | null;
+  iban: string | null;
+  importe_total: string | number | null;
 };
 
 /**
@@ -28,13 +30,13 @@ export default function BatchDuplicateCompareSection({
           Fotos de este lote que coinciden entre sí
         </h2>
         <p className="text-xs text-amber-900/90 mt-1 leading-relaxed max-w-3xl">
-          Mismo cliente + misma fecha de promoción, o mismo número de albarán. Comparad las
-          imágenes: si solo es repetición por error subiendo dos fotos iguales, podéis
-          descartar una en{" "}
+          El sistema agrupa por: mismo NIF + misma fecha, mismo número de albarán, o{" "}
+          <strong>mismo IBAN y mismo importe</strong>. Comparad las imágenes; si solo
+          es repetición por error podéis{" "}
           <Link href="/contracts/review" className="underline font-medium">
-            Por revisar
-          </Link>{" "}
-          o desde cada ficha.
+            revisar aquí
+          </Link>
+          {" "}o desde cada ficha.
         </p>
       </div>
       <div className="p-5 space-y-8">
@@ -77,6 +79,17 @@ export default function BatchDuplicateCompareSection({
                     </p>
                     <p className="text-slate-600 font-mono">
                       NIF {item.nif?.trim() || "—"}
+                    </p>
+                    <p className="text-slate-600 font-mono text-[11px] break-all">
+                      IBAN {item.iban?.trim() || "—"}
+                    </p>
+                    <p className="text-slate-600">
+                      Importe{" "}
+                      {formatMoney(
+                        item.importe_total == null
+                          ? null
+                          : Number(item.importe_total)
+                      )}
                     </p>
                     {item.marked_duplicate && (
                       <span className="inline-block w-fit text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-medium">

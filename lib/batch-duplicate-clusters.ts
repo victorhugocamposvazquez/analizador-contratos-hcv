@@ -1,12 +1,14 @@
 /**
  * Misma idea que la RPC find_duplicates: dos contratos "se parecen" si
- * (mismo NIF + misma fecha de promoción) o mismo nº de albarán — solo entre datos no nulos.
+ * (mismo NIF + misma fecha), o mismo nº de albarán, o mismo IBAN + mismo importe total.
  */
 export type DupClusterContract = {
   id: string;
   nif: string | null;
   fecha_promocion: string | null;
   num_albaran: string | null;
+  iban: string | null;
+  importe_total: string | number | null;
   status?: string | null;
   marked_duplicate?: boolean | null;
 };
@@ -14,6 +16,23 @@ export type DupClusterContract = {
 function normNif(s: string | null | undefined): string | null {
   if (!s?.trim()) return null;
   return s.toUpperCase().replace(/\s/g, "");
+}
+
+/** Misma normalización que en BD para IBAN. */
+function normIban(s: string | null | undefined): string | null {
+  if (!s?.trim()) return null;
+  return s.toUpperCase().replace(/\s/g, "");
+}
+
+function sameImporte(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined
+): boolean {
+  if (a == null || b == null) return false;
+  const x = typeof a === "number" ? a : Number(String(a));
+  const y = typeof b === "number" ? b : Number(String(b));
+  if (Number.isNaN(x) || Number.isNaN(y)) return false;
+  return x === y;
 }
 
 export function duplicatePairWithinBatch(a: DupClusterContract, b: DupClusterContract): boolean {
@@ -33,6 +52,17 @@ export function duplicatePairWithinBatch(a: DupClusterContract, b: DupClusterCon
   const ala = a.num_albaran?.trim() ?? null;
   const alb = b.num_albaran?.trim() ?? null;
   if (ala && alb && ala === alb) return true;
+
+  const ia = normIban(a.iban);
+  const ib = normIban(b.iban);
+  if (
+    ia &&
+    ib &&
+    ia === ib &&
+    sameImporte(a.importe_total, b.importe_total)
+  ) {
+    return true;
+  }
   return false;
 }
 
