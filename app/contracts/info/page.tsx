@@ -163,6 +163,118 @@ export default function ContractsInfoPage() {
           solapamiento de texto, ambigüedad en cifras o en el papel arrugado pueden dar lecturas
           incorrectas parciales; la confianza que declara es orientativa y la revisión humana sigue siendo necesaria cuando el negocio lo exija.
         </p>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4 mt-4 space-y-2">
+          <h3 className="text-sm font-semibold text-slate-900">
+            Coste por extracción (facturación Anthropic / Claude API)
+          </h3>
+          <p className="text-sm text-slate-700 leading-relaxed">
+            Según las{" "}
+            <a
+              href="https://platform.claude.com/docs/en/about-claude/pricing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-900 underline underline-offset-2 hover:no-underline"
+            >
+              tarifas públicas actuales
+            </a>{" "}
+            de Claude para la API estándar (no incluyen impuestos ni descuentos opcionales como
+            Batch o caché), <strong>Claude Sonnet 4.6</strong> factura aproximadamente:
+          </p>
+          <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+            <li>
+              <strong>Entrada:</strong> ~3 USD por cada millón de tokens de entrada (
+              <code>prompt</code> del sistema, la imagen convertida a tokens y el texto corto que
+              envía el job).
+            </li>
+            <li>
+              <strong>Salida:</strong> ~15 USD por cada millón de tokens de la respuesta (en este
+              proyecto el JSON tiene un tope de <code>max_tokens: 2000</code> por petición; el
+              consumo real suele ser menor).
+            </li>
+          </ul>
+          <p className="text-sm text-slate-700 leading-relaxed">
+            Cada <strong>extracción ≈ una llamada por foto</strong>. El importe real lo fija el{" "}
+            <strong>uso de tokens</strong> que devuelve la API (<code>usage</code> en la
+            respuesta): la imagen + el prompt de sistema suman la entrada; el JSON la salida. Si
+            la resolución o el tamaño de la foto suben mucho, suben también los tokens de entrada.
+          </p>
+
+          <div className="mt-3 rounded-lg bg-white border border-slate-200/80 px-3 py-3 space-y-2">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+              Ejemplo numérico (supuesto realista por contrato)
+            </p>
+            <p className="text-sm text-slate-700 leading-relaxed">
+              Como referencia de orden práctico: <strong>~1.500 tokens de entrada</strong>{" "}
+              (imagen típica + prompt del sistema) y <strong>~500 tokens de salida</strong>{" "}
+              (JSON de campos), con Sonnet 4.6 a los precios citados más arriba.
+            </p>
+            <ul className="text-sm text-slate-800 font-mono leading-relaxed space-y-1.5 pl-0 list-none border-l-2 border-slate-300 pl-3">
+              <li>
+                1 contrato → entrada (1 500 × 10⁻⁶ M × $3) + salida (500 × 10⁻⁶ M × $15) ≈{" "}
+                <strong className="font-sans">
+                  $0,0045 + $0,0075 = ~$0,012 USD
+                </strong>{" "}
+                <span className="text-slate-600 font-sans text-xs">
+                  (unos ~0,01 € según paridad; sin IVA).
+                </span>
+              </li>
+              <li>
+                <strong>1.000 contratos</strong> → 1,5 M tokens in × ($3/M) = <strong>$4,50</strong>;
+                0,5 M tokens out × ($15/M) = <strong>$7,50</strong> → total API ≈ <strong>$12</strong>.
+                Tipo de cambio típico: <strong>~11 €</strong> solo lo facturado por tokens (sin
+                impuestos locales).
+              </li>
+            </ul>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 mt-3">
+            <div className="rounded-lg bg-white border border-slate-200/80 px-3 py-2.5">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                Misma proporción lineal (mismo supuesto ×N)
+              </p>
+              <ul className="text-sm text-slate-800 mt-1.5 space-y-1 leading-snug">
+                <li>
+                  ~500 contratos → <strong>~6 €</strong> (~6 USD de API al mismo orden)
+                </li>
+                <li>
+                  ~1.000 contratos → <strong>~11–12 €</strong> de API (~12 USD); como cifra de
+                  trabajo suele bastar <strong>~12–13 €</strong> antes de IVA (redondeos y tipo).
+                </li>
+                <li>
+                  ~5.000/mes → <strong>~60 €</strong> · ~10.000/mes → <strong>~120 €</strong> (API,
+                  mismo supuesto de tokens por unidad).
+                </li>
+              </ul>
+            </div>
+            <div className="rounded-lg bg-white border border-slate-200/80 px-3 py-2.5">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                Reintentos · IVA
+              </p>
+              <p className="text-sm text-slate-700 mt-1 leading-snug">
+                Cada job puede pasar por <strong>hasta tres intentos</strong> en cola antes de
+                quedar en error; cada ejecución que vuelve a llamar a Claude suma otro{" "}
+                <code>usage</code>. Si hubiera muchísimos fallos seguidos, el coste se acerca a un
+                multiplicador (&gt;1); con una subida estable y sin errores de integración suelen ser
+                pocos los reintentos.
+              </p>
+              <p className="text-sm text-slate-700 mt-2 leading-snug">
+                Si aplicas <strong>IVA</strong> (por ejemplo 21 % sobre tu factura con el proveedor),
+                ~11 € de base orientativa API → orden de <strong>~13 €</strong> con IVA (solo
+                referencia fiscal; tu caso concreto es distinto).
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Solo referencia; el dato fiable es el <code>usage</code> y la factura de Anthropic. No
+            es presupuesto contractual.
+          </p>
+          <p className="text-xs text-slate-500">
+            Quien paga la API es quien tenga la clave configurada en Supabase; el coste no lo cobra
+            esta pantalla, solo el proveedor según su facturación mensual.
+          </p>
+        </div>
+
         <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1.5 mt-3 leading-relaxed">
           <li>
             Dependéis del servicio Anthropic (disponibilidad, cambios en modelos, precios,
