@@ -58,9 +58,32 @@ export async function PATCH(req: NextRequest) {
   if (status) update.status = status; // confirmed | discarded | needs_review
   if (typeof marked_duplicate === "boolean") update.marked_duplicate = marked_duplicate;
 
-  const { error } = await supabase.from("contracts").update(update).eq("id", id);
+  const touchedLocalidad = fields && typeof fields === "object" && "localidad" in fields;
+
+  const { data: row, error } = await supabase
+    .from("contracts")
+    .update(update)
+    .eq("id", id)
+    .select("localidad")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+
+  const inputLocTrim =
+    touchedLocalidad &&
+    typeof (fields as Record<string, unknown>).localidad === "string"
+      ? String((fields as Record<string, unknown>).localidad ?? "").trim()
+      : "";
+
+  const localityDiscarded =
+    Boolean(touchedLocalidad) &&
+    inputLocTrim.length > 0 &&
+    (row?.localidad == null || String(row.localidad).trim().length === 0);
+
+  return NextResponse.json({
+    ok: true,
+    localidad: row?.localidad ?? null,
+    localityDiscarded,
+  });
 }
 
 // Borrar contrato: primero el fichero en Storage (API), luego la fila.

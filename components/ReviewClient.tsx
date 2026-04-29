@@ -70,10 +70,15 @@ export default function ReviewClient({ items }: { items: Item[] }) {
       }),
     });
     setBusy(false);
+    const j = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
       alert(j.error || "No se pudo guardar. Prueba otra vez.");
       return;
+    }
+    if (j.localityDiscarded === true) {
+      alert(
+        "La localidad escrita parece dirección completa o lugar de entrega y no se ha guardado. Deja solo el nombre del municipio (p. ej. A Coruña) sin calle ni C.P."
+      );
     }
     next();
   }

@@ -28,6 +28,7 @@ export default function ContractLocalidadEditor({
   );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [discardHint, setDiscardHint] = useState<string | null>(null);
 
   useEffect(() => {
     setValue(typeof initialLocalidad === "string" ? initialLocalidad : "");
@@ -40,6 +41,7 @@ export default function ContractLocalidadEditor({
   async function save() {
     setBusy(true);
     setErr(null);
+    setDiscardHint(null);
     const r = await fetch("/api/contracts", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -54,6 +56,13 @@ export default function ContractLocalidadEditor({
       setErr(typeof j.error === "string" ? j.error : "No se pudo guardar.");
       return;
     }
+    if (j.localityDiscarded === true && trimmed.length > 0) {
+      setDiscardHint(
+        "Este texto parece dirección completa o lugar de entrega, no solo el municipio. No se guarda en «localidad»: quedará sin localidad hasta que escribas el nombre del pueblo o ciudad únicamente."
+      );
+    } else {
+      setDiscardHint(null);
+    }
     router.refresh();
   }
 
@@ -62,8 +71,8 @@ export default function ContractLocalidadEditor({
       <div>
         <p className="text-xs font-medium text-slate-600">Localidad</p>
         <p className="text-xs text-slate-500 mt-0.5">
-          Se usa para agrupar en{" "}
-          <span className="font-medium">Contratos → Por localidad</span>.
+          Solo el <strong>municipio</strong> (p. ej. A Coruña), no líneas largas tipo lugar de entrega ni
+          dirección. Si pegas esa línea aquí no se guardará como localidad — quedará sin localidad.
         </p>
       </div>
       <div className="flex flex-wrap items-end gap-2">
@@ -87,6 +96,11 @@ export default function ContractLocalidadEditor({
         </button>
       </div>
       {err && <p className="text-sm text-red-700">{err}</p>}
+      {discardHint && (
+        <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {discardHint}
+        </p>
+      )}
       {showFolderHint && savedHasLocalidad && (
         <p className="text-sm pt-1 border-t border-slate-200">
           <Link
