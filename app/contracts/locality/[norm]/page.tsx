@@ -9,6 +9,7 @@ import {
 import ContractsBulkTable, {
   type ContractRow,
 } from "@/components/ContractsBulkTable";
+import AssignLocalidadPanel from "@/components/AssignLocalidadPanel";
 import { displayFilenameResolved } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -51,15 +52,27 @@ export default async function LocalityContractsPage({
 
   const q = (searchParams.q ?? "").trim();
 
-  const [{ data: rawRows, error: e1 }, { data: aggRows, error: e2 }] =
+  const [{ data: rawRows, error: e1 }, { data: aggRows, error: e2 }, sinRes] =
     await Promise.all([
       supabase.rpc("contracts_by_normalized_locality", {
         p_localidad_norm: decoded,
       }),
       supabase.rpc("contract_counts_by_locality"),
+      decoded !== ""
+        ? supabase.rpc("contracts_by_normalized_locality", {
+            p_localidad_norm: "",
+          })
+        : Promise.resolve({ data: [] as unknown[], error: null }),
     ]);
 
-  const errMsg = e1?.message ?? e2?.message;
+  const sinLocalidadRows = (
+    decoded !== "" ? (sinRes?.data ?? []) : []
+  ) as ContractRow[];
+
+  const errMsg =
+    e1?.message ??
+    e2?.message ??
+    (sinRes && "error" in sinRes ? sinRes.error?.message : undefined);
   if (errMsg) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
@@ -87,6 +100,8 @@ export default async function LocalityContractsPage({
 
   const formAction = `/contracts/locality/${urlSegmentForNormalizedLocality(decoded)}`;
 
+  const defaultAssignLocalidad = hitList[0]?.localidad_display?.trim() ?? "";
+
   return (
     <div className="space-y-6">
       <div>
@@ -111,6 +126,14 @@ export default async function LocalityContractsPage({
             : " (hasta 500 contratos cargados desde la función SQL)."}
         </p>
       </div>
+
+      {decoded !== "" && (
+        <AssignLocalidadPanel
+          targetNorm={decoded}
+          defaultLocalidad={defaultAssignLocalidad}
+          candidates={sinLocalidadRows}
+        />
+      )}
 
       <div className="bg-white rounded-2xl border shadow-sm">
         <div className="px-5 py-4 border-b flex flex-wrap items-center gap-3">
